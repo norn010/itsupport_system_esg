@@ -10,6 +10,8 @@ const InventoryList = () => {
   const [editingId, setEditingId] = useState(null)
   const [locations, setLocations] = useState([])
   const [saving, setSaving] = useState(false)
+  const [formData, setFormData] = useState({ name: '', category: '', quantity: 0, reorder_level: 5, location_id: '' })
+  const [editQuantity, setEditQuantity] = useState(0)
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('')
@@ -38,7 +40,10 @@ const InventoryList = () => {
     e.preventDefault()
     setSaving(true)
     try {
-      await axios.post('/api/inventory', formData)
+      const data = { ...formData };
+      if (!data.location_id && locSearch) data.location_name = locSearch;
+
+      await axios.post('/api/inventory', data)
       setShowCreateModal(false)
       setFormData({ name: '', category: '', quantity: 0, reorder_level: 5, location_id: '' })
       setLocSearch('')

@@ -42,9 +42,18 @@ const AssetDetail = () => {
   const [locOpen, setLocOpen] = useState(false)
   const [locSearch, setLocSearch] = useState('')
 
-  // Maintenance Modal Search
   const [maintVenOpen, setMaintVenOpen] = useState(false)
   const [maintVenSearch, setMaintVenSearch] = useState('')
+
+  const formatDate = (val) => {
+    if (!val) return '—'
+    // Handle Firebase Timestamp object { _seconds, _nanoseconds }
+    if (val && typeof val === 'object' && val._seconds) {
+      return new Date(val._seconds * 1000).toLocaleString()
+    }
+    const d = new Date(val)
+    return isNaN(d.getTime()) ? '—' : d.toLocaleString()
+  }
 
   const fetchAsset = async () => {
     try {
@@ -110,9 +119,13 @@ const AssetDetail = () => {
     e.preventDefault()
     setSaving(true)
     try {
-      await axios.post(`/api/assets/${id}/maintenance`, maintData)
+      const data = { ...maintData };
+      if (!data.vendor_id && maintVenSearch) data.vendor_name = maintVenSearch;
+
+      await axios.post(`/api/assets/${id}/maintenance`, data)
       setShowMaintenanceModal(false)
       setMaintData({ issue_description: '', vendor_id: '', cost: '', start_date: '', status: 'pending' })
+      setMaintVenSearch('')
       fetchAsset()
     } catch (err) {
       alert(err.response?.data?.message || 'Error')
@@ -212,21 +225,33 @@ const AssetDetail = () => {
           <p className="text-lg text-slate-600 mt-1">{asset.name}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {asset.status === 'Available' && (
+          {!asset.assignments?.some(a => !a.returned_at) && asset.status === 'Available' && (
             <button onClick={() => setShowAssignModal(true)} className="btn-primary text-sm">
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
               Assign
             </button>
           )}
-          {asset.status === 'In Use' && (
+          {asset.assignments?.some(a => !a.returned_at) && (
             <button onClick={handleReturn} className="btn-secondary text-sm">
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
               Return
             </button>
           )}
+          {asset.status === 'Repair' && (
+            <button 
+              onClick={() => {
+                const active = asset.maintenance?.find(m => m.status !== 'completed');
+                if (active) handleUpdateMaintenance(active.id, 'completed');
+              }} 
+              className="btn-primary text-sm !bg-emerald-600 hover:!bg-emerald-700 border-emerald-600"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+              ซ่อมเสร็จแล้ว
+            </button>
+          )}
           <button onClick={() => setShowMaintenanceModal(true)} className="btn-secondary text-sm">
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-            Maintenance
+            ส่งซ่อม
           </button>
           {!editMode && (
             <button onClick={handleEdit} className="btn-secondary text-sm">Edit</button>
@@ -514,8 +539,8 @@ const AssetDetail = () => {
                 ['Model', asset.model || '—'],
                 ['Serial Number', asset.serial_number || '—'],
                 ['Vendor', asset.vendor_name || '—'],
-                ['Purchase Date', asset.purchase_date ? new Date(asset.purchase_date).toLocaleDateString() : '—'],
-                ['Warranty Expiry', asset.warranty_expiry ? new Date(asset.warranty_expiry).toLocaleDateString() : '—'],
+                ['Purchase Date', formatDate(asset.purchase_date)],
+                ['Warranty Expiry', formatDate(asset.warranty_expiry)],
                 ['Cost', asset.cost ? `฿${Number(asset.cost).toLocaleString()}` : '—'],
                 ['Location', asset.location_name || '—'],
                 ['Assigned To', asset.assigned_user_name || '—'],
@@ -551,8 +576,8 @@ const AssetDetail = () => {
                 {asset.assignments.map(a => (
                   <tr key={a.id} className="border-b border-slate-50 hover:bg-slate-50/50">
                     <td className="py-3 px-4 font-medium">{a.user_name}</td>
-                    <td className="py-3 px-4 text-slate-500">{new Date(a.assigned_at).toLocaleString()}</td>
-                    <td className="py-3 px-4 text-slate-500">{a.returned_at ? new Date(a.returned_at).toLocaleString() : '—'}</td>
+                    <td className="py-3 px-4 text-slate-500">{formatDate(a.assigned_at)}</td>
+                    <td className="py-3 px-4 text-slate-500">{formatDate(a.returned_at)}</td>
                     <td className="py-3 px-4 text-slate-500">{a.assigned_by_name || '—'}</td>
                     <td className="py-3 px-4 text-slate-500">{a.note || '—'}</td>
                     <td className="py-3 px-4">
@@ -593,8 +618,8 @@ const AssetDetail = () => {
                     <td className="py-3 px-4 max-w-xs truncate">{m.issue_description}</td>
                     <td className="py-3 px-4 text-slate-500">{m.vendor_name || '—'}</td>
                     <td className="py-3 px-4 text-slate-500">{m.cost ? `฿${Number(m.cost).toLocaleString()}` : '—'}</td>
-                    <td className="py-3 px-4 text-slate-500">{m.start_date ? new Date(m.start_date).toLocaleDateString() : '—'}</td>
-                    <td className="py-3 px-4 text-slate-500">{m.end_date ? new Date(m.end_date).toLocaleDateString() : '—'}</td>
+                    <td className="py-3 px-4 text-slate-500">{formatDate(m.start_date)}</td>
+                    <td className="py-3 px-4 text-slate-500">{formatDate(m.end_date)}</td>
                     <td className="py-3 px-4">
                       <span className={`badge ${m.status === 'completed' ? 'bg-emerald-500/10 text-emerald-700 border-emerald-200' : m.status === 'in_progress' ? 'bg-blue-500/10 text-blue-700 border-blue-200' : 'bg-amber-500/10 text-amber-700 border-amber-200'}`}>
                         {m.status}
@@ -644,7 +669,7 @@ const AssetDetail = () => {
                     <td className="py-3 px-4">
                       <span className={`badge badge-${t.priority?.toLowerCase()}`}>{t.priority}</span>
                     </td>
-                    <td className="py-3 px-4 text-slate-500">{new Date(t.created_at).toLocaleDateString()}</td>
+                    <td className="py-3 px-4 text-slate-500">{formatDate(t.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -677,7 +702,7 @@ const AssetDetail = () => {
                         <span className="text-xs text-slate-400">by {log.actor_name || 'System'}</span>
                       </div>
                       <p className="text-sm text-slate-500 mt-0.5">{log.description}</p>
-                      <span className="text-xs text-slate-400">{new Date(log.created_at).toLocaleString()}</span>
+                      <span className="text-xs text-slate-400">{formatDate(log.created_at)}</span>
                     </div>
                   </div>
                 </div>

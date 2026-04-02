@@ -12,6 +12,7 @@ const TicketList = () => {
   }, [filters])
 
   const fetchTickets = async () => {
+    setLoading(true)
     try {
       const params = new URLSearchParams()
       if (filters.status) params.append('status', filters.status)

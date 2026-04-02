@@ -28,6 +28,15 @@ const LicenseList = () => {
   const [asOpen, setAsOpen] = useState(false)
   const [asSearch, setAsSearch] = useState('')
 
+  const formatDate = (val) => {
+    if (!val) return '—'
+    if (val && typeof val === 'object' && val._seconds) {
+      return new Date(val._seconds * 1000).toLocaleDateString()
+    }
+    const d = new Date(val)
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString()
+  }
+
   const fetchLicenses = async () => {
     try {
       const res = await axios.get('/api/licenses')
@@ -46,7 +55,10 @@ const LicenseList = () => {
     e.preventDefault()
     setSaving(true)
     try {
-      await axios.post('/api/licenses', formData)
+      const data = { ...formData };
+      if (!data.vendor_id && venSearch) data.vendor_name = venSearch;
+
+      await axios.post('/api/licenses', data)
       setShowCreateModal(false)
       setFormData({ name: '', license_key: '', total_seats: 1, expiry_date: '', vendor_id: '', cost: '' })
       setVenSearch('')
@@ -177,7 +189,8 @@ const LicenseList = () => {
                 .filter(l => l.name.toLowerCase().includes(searchQuery.toLowerCase()))
                 .filter(l => !vendorFilter || l.vendor_id == vendorFilter)
                 .map(l => {
-                const isExpiringSoon = l.expiry_date && new Date(l.expiry_date) <= new Date(Date.now() + 30*24*60*60*1000)
+                const expDate = l.expiry_date?._seconds ? new Date(l.expiry_date._seconds * 1000) : new Date(l.expiry_date)
+                const isExpiringSoon = l.expiry_date && !isNaN(expDate.getTime()) && expDate <= new Date(Date.now() + 30*24*60*60*1000)
                 const seatsFull = l.used_seats >= l.total_seats
                 return (
                   <tr key={l.id} className="border-b border-slate-50 hover:bg-primary-50/30 transition-colors">
@@ -189,12 +202,10 @@ const LicenseList = () => {
                     </td>
                     <td className="py-3 px-4 text-slate-500">{l.vendor_name || '—'}</td>
                     <td className="py-3 px-4">
-                      {l.expiry_date ? (
-                        <span className={isExpiringSoon ? 'text-red-600 font-medium' : 'text-slate-500'}>
-                          {new Date(l.expiry_date).toLocaleDateString()}
-                          {isExpiringSoon && ' ⚠'}
-                        </span>
-                      ) : '—'}
+                      <span className={isExpiringSoon ? 'text-red-600 font-medium' : 'text-slate-500'}>
+                        {formatDate(l.expiry_date)}
+                        {isExpiringSoon && ' ⚠'}
+                      </span>
                     </td>
                     <td className="py-3 px-4 text-slate-500">{l.cost ? `฿${Number(l.cost).toLocaleString()}` : '—'}</td>
                     <td className="py-3 px-4 flex gap-2">
@@ -380,7 +391,7 @@ const LicenseList = () => {
                       <div>
                         <span className="font-medium text-sm text-slate-800">{a.user_name || '—'}</span>
                         {a.asset_id && <span className="text-xs text-slate-400 ml-2">Asset #{a.asset_id}</span>}
-                        <p className="text-xs text-slate-400">{new Date(a.assigned_at).toLocaleString()}</p>
+                        <p className="text-xs text-slate-400">{formatDate(a.assigned_at)}</p>
                       </div>
                       {a.revoked_at ? (
                         <span className="badge bg-slate-100 text-slate-500 border-slate-200">Revoked</span>

@@ -277,10 +277,16 @@ export const exportTicketsExcel = async (req, res) => {
     sheet.getRow(1).font = { bold: true };
 
     tickets.forEach(t => {
+      const formatDate = (val) => {
+        if (!val) return '';
+        const d = val.toDate ? val.toDate() : new Date(val);
+        return isNaN(d.getTime()) ? '' : d.toLocaleString();
+      };
+
       sheet.addRow({
         ...t,
-        created_at: new Date(t.created_at).toLocaleString(),
-        due_date: t.due_date ? new Date(t.due_date).toLocaleString() : ''
+        created_at: formatDate(t.created_at),
+        due_date: formatDate(t.due_date)
       });
     });
 

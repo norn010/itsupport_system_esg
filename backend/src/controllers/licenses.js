@@ -1,9 +1,17 @@
-import { SoftwareLicense } from '../models/assetModels.js';
+import { SoftwareLicense, Vendor } from '../models/assetModels.js';
 
 export const createLicense = async (req, res) => {
   try {
-    if (!req.body.name) return res.status(400).json({ message: 'License name is required' });
-    const license = await SoftwareLicense.create(req.body);
+    const data = { ...req.body };
+    if (!data.name) return res.status(400).json({ message: 'License name is required' });
+
+    if (data.vendor_name) {
+      const v = await Vendor.findOrCreateByName(data.vendor_name);
+      data.vendor_id = v.id;
+      delete data.vendor_name;
+    }
+
+    const license = await SoftwareLicense.create(data);
     res.status(201).json({ message: 'License created', license });
   } catch (error) {
     console.error('Create license error:', error);
@@ -35,7 +43,14 @@ export const getLicenseById = async (req, res) => {
 
 export const updateLicense = async (req, res) => {
   try {
-    const updated = await SoftwareLicense.update(req.params.id, req.body);
+    const data = { ...req.body };
+    if (data.vendor_name) {
+      const v = await Vendor.findOrCreateByName(data.vendor_name);
+      data.vendor_id = v.id;
+      delete data.vendor_name;
+    }
+
+    const updated = await SoftwareLicense.update(req.params.id, data);
     if (!updated) return res.status(404).json({ message: 'License not found' });
     res.json({ message: 'License updated', license: updated });
   } catch (error) {

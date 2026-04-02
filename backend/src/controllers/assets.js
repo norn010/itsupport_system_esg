@@ -23,14 +23,22 @@ const logAssetAction = async (assetId, actionType, description, actor) => {
 };
 
 const resolveIds = async (data) => {
+  if (!data.category_id && data.category_name && data.category_name.trim()) {
+    let c = await AssetCategory.findOrCreateByName(data.category_name);
+    data.category_id = c.id;
+  }
+  if (!data.subcategory_id && data.subcategory_name && data.subcategory_name.trim()) {
+    if (data.category_id) {
+       let s = await AssetCategory.findOrCreateSubcategoryByName(data.category_id, data.subcategory_name);
+       data.subcategory_id = s.id;
+    }
+  }
   if (!data.vendor_id && data.vendor_name && data.vendor_name.trim()) {
-    let v = await Vendor.findByName(data.vendor_name);
-    if (!v) v = await Vendor.create({ name: data.vendor_name });
+    let v = await Vendor.findOrCreateByName(data.vendor_name);
     data.vendor_id = v.id;
   }
   if (!data.location_id && data.location_name && data.location_name.trim()) {
-    let l = await Location.findByName(data.location_name);
-    if (!l) l = await Location.create({ name: data.location_name });
+    let l = await Location.findOrCreateByName(data.location_name);
     data.location_id = l.id;
   }
 };
@@ -164,15 +172,15 @@ export const assignAsset = async (req, res) => {
     if (active) return res.status(400).json({ message: 'Asset is already assigned. Return it first.' });
 
     const assignment = await AssetAssignment.assign({
-      asset_id: parseInt(id),
+      asset_id: id,
       user_id: user_id || 0,
       user_name,
       assigned_by: req.user.id,
       note
     });
 
-    await Asset.update(id, { status: 'In Use', assigned_to: user_id || null });
-    await logAssetAction(parseInt(id), 'assigned', `Assigned to ${user_name}`, req.user);
+    await Asset.update(id, { status: 'In Use', assigned_to: user_id || null, assigned_user_name: user_name });
+    await logAssetAction(id, 'assigned', `Assigned to ${user_name}`, req.user);
 
     res.json({ message: 'Asset assigned', assignment });
   } catch (error) {
@@ -191,8 +199,8 @@ export const returnAsset = async (req, res) => {
     if (!active) return res.status(400).json({ message: 'Asset is not currently assigned' });
 
     await AssetAssignment.returnAsset(active.id);
-    await Asset.update(id, { status: 'Available', assigned_to: null });
-    await logAssetAction(parseInt(id), 'returned', `Returned by ${active.user_name}`, req.user);
+    await Asset.update(id, { status: 'Available', assigned_to: null, assigned_user_name: null });
+    await logAssetAction(id, 'returned', `Returned by ${active.user_name}`, req.user);
 
     res.json({ message: 'Asset returned successfully' });
   } catch (error) {
@@ -209,12 +217,25 @@ export const createMaintenance = async (req, res) => {
     const asset = await Asset.findById(id);
     if (!asset) return res.status(404).json({ message: 'Asset not found' });
 
-    const data = { ...req.body, asset_id: parseInt(id), created_by: req.user.id };
+    const data = { ...req.body, asset_id: id, created_by: req.user.id };
     if (!data.issue_description) return res.status(400).json({ message: 'Issue description is required' });
+
+    // Auto-set start_date if missing
+    if (!data.start_date) {
+      data.start_date = new Date();
+    } else if (typeof data.start_date === 'string') {
+      data.start_date = new Date(data.start_date);
+    }
+
+    if (data.vendor_name) {
+      const v = await Vendor.findOrCreateByName(data.vendor_name);
+      data.vendor_id = v.id;
+      delete data.vendor_name;
+    }
 
     const record = await AssetMaintenance.create(data);
     await Asset.update(id, { status: 'Repair' });
-    await logAssetAction(parseInt(id), 'maintenance', `Maintenance created: ${data.issue_description}`, req.user);
+    await logAssetAction(id, 'maintenance', `Maintenance created: ${data.issue_description}`, req.user);
 
     res.status(201).json({ message: 'Maintenance record created', maintenance: record });
   } catch (error) {
@@ -226,10 +247,15 @@ export const createMaintenance = async (req, res) => {
 export const updateMaintenance = async (req, res) => {
   try {
     const { maintenanceId } = req.params;
-    const updated = await AssetMaintenance.update(maintenanceId, req.body);
+    const updates = { ...req.body };
+    if (updates.status === 'completed' && !updates.end_date) {
+      updates.end_date = new Date(); // Use Date object, model will handle it
+    }
+
+    const updated = await AssetMaintenance.update(maintenanceId, updates);
     if (!updated) return res.status(404).json({ message: 'Maintenance record not found' });
 
-    if (req.body.status === 'completed') {
+    if (updates.status === 'completed') {
       await Asset.update(updated.asset_id, { status: 'Available' });
       await logAssetAction(updated.asset_id, 'maintenance', 'Maintenance completed', req.user);
     }

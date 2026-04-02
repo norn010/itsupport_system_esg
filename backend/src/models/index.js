@@ -29,8 +29,11 @@ export const Ticket = {
     if (status) query = query.where('status', '==', status);
     if (priority) query = query.where('priority', '==', priority);
 
-    const snapshot = await query.orderBy('created_at', 'desc').get();
+    const snapshot = await query.get();
     let tickets = snapshot.docs.map(doc => toObj(doc));
+
+    // Client-side sorting to avoid composite index requirements
+    tickets.sort((a, b) => (b.created_at?.toDate?.() || 0) - (a.created_at?.toDate?.() || 0));
 
     if (search) {
       const lowerSearch = search.toLowerCase();
@@ -40,10 +43,10 @@ export const Ticket = {
       );
     }
 
-    // Handle offset and limit (Firestore doesn't have offset easily, so manually slicing)
+    // Handle offset and limit
     const resultTickets = tickets.slice(offset, offset + limit);
 
-    // Resolve related data (Denormalization/Simulated Joins)
+    // Resolve related data
     const enrichedTickets = await Promise.all(resultTickets.map(async (t) => {
       if (t.assigned_to) {
         const userSnap = await db.collection('users').doc(t.assigned_to.toString()).get();
@@ -368,10 +371,9 @@ export const UserNotification = {
   async findByUserId(userId) {
     const snap = await db.collection('user_notifications')
       .where('user_id', '==', userId)
-      .orderBy('created_at', 'desc')
-      .limit(50)
       .get();
-    return snap.docs.map(doc => toObj(doc));
+    const notifications = snap.docs.map(doc => toObj(doc));
+    return notifications.sort((a, b) => (b.created_at?.toDate?.() || 0) - (a.created_at?.toDate?.() || 0)).slice(0, 50);
   },
 
   async markAsRead(notificationId, userId) {

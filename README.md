@@ -1,125 +1,83 @@
-# IT Support Ticket System + IT Asset Management
+# IT Support Ticket System + IT Asset Management (Firebase Edition)
 
-A production-ready IT Support Ticket System with real-time chat, image uploads, notifications, role-based access control, **and a full IT Asset Management (ITAM) module**.
+A production-ready IT Support Ticket System with real-time chat, image uploads, notifications, and role-based access control, **powered by Firebase Firestore and Authentication**. Includes a full IT Asset Management (ITAM) module.
 
 ## 🧱 Tech Stack
 
-- **Tech Stack**: React 18, Vite, Tailwind CSS, SQL Server, Node.js, Socket.io
+- **Frontend**: React 18, Vite, Tailwind CSS, Framer Motion
+- **Backend**: Node.js, Express, Socket.io
+- **Database**: **Firebase Firestore** (NoSQL)
+- **Authentication**: Firebase Authentication (via custom JWT)
 - **Real-time Engine**: Socket.io for chat and live status updates
-- **Audio Alerts**: Custom `.m4a` notifications for chat messages
-- **UI Architecture**: Standardized Searchable Comboboxes (iOS-stable absolute-layer pattern)
-- **Database Architecture**: Foreign-key consistency with auto-creation of missing metadata (Vendors, Locations)
-- **Security**: JWT-based RBAC (Manager / IT Staff / Public)
+- **Storage**: Local filesystem (uploads/) with Firestore metadata
+- **Date Formatting**: Global Thai (พ.ศ.) date formatting logic
 
 ## 👤 User Roles
 
 ### 1. Guest (No Login)
 - Create tickets with image uploads
-- View their ticket via Ticket ID
+- **AnyDesk ID Support**: Optionally specify AnyDesk ID for remote help
+- View their ticket via Ticket ID or **Scan QR Code**
 - Real-time chat with IT staff
 
-### 2. IT Staff
-- Login required
-- View all tickets with filters
+### 2. IT Staff / Admin
+- Login required (Manage via **Staff User** menu)
+- View all tickets with filters & scannable queue
+- **AnyDesk Integration**: See AnyDesk ID immediately in Ticket Detail
 - Chat with users in real-time
 - Update ticket status and priority
-- Assign tickets to staff
-- **ITAM**: View, create, and update assets (limited fields)
-- **ITAM**: Assign/return assets, create maintenance records
-
-### 3. Manager
-- All IT permissions
-- Dashboard with statistics and charts
-- View performance metrics
-- SLA monitoring
-- **ITAM**: Full asset CRUD (including delete)
-- **ITAM**: Manage vendors, licenses, inventory
-- **ITAM**: Asset dashboard and reporting
+- **ITAM**: Full asset registry, license management, and inventory tracking
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
 - Node.js (v18 or higher)
-- SQL Server database
-- LINE Notify token (optional)
-- SMTP email credentials (optional)
+- Firebase Project with Firestore enabled
+- Firebase Service Account Key (`serviceAccountKey.json`)
 
 ### Installation
 
 1. **Clone or extract the project**:
 ```bash
-cd itsupport_system
+cd itsupport_system_ESG2
 ```
 
 2. **Setup Backend**:
 ```bash
 cd backend
-# 1. Create .env from example (then edit with your DB/Email credentials)
+# 1. Create .env (edit with your Firebase Project ID & JWT Secret)
 cp .env.example .env
 
-# 2. Install dependencies
-npm install
-npm run init-db
+# 2. Add your Firebase serviceAccountKey.json to the backend/ directory
 
-# 3. COMPLETE DATABASE SETUP (ONE COMMAND - Tables, Migrations, Seeds)
-node src/config/init-db.js
+# 3. Install dependencies
+npm install
 
 # 4. Start Server
 npm run dev
 ```
 
-> [!NOTE]
-> The \`node src/config/init-db.js\` command now automatically handles ALL migrations (including V2 and ITAM). No manual SQL execution is required!
-
-4. **Setup Frontend** (in a new terminal):
+3. **Setup Frontend** (in a new terminal):
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-5. **Access the application**:
+4. **Access the application**:
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:5000
 
-### Default Accounts
+### Default Accounts (Current)
 
 | Username | Password | Role |
 |----------|----------|------|
 | admin | admin123 | Manager |
-| itstaff | it123 | IT Staff |
+| norn | norn123 | IT Staff |
 
-### Environment Variables
-
-Create `backend/.env` file:
-
-```env
-# Database Configuration
-DB_HOST=127.0.0.1
-DB_PORT=1433
-DB_NAME=itsupportDB
-DB_USER=sa
-DB_PASSWORD=xxxxxxx
-
-# JWT Secret
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-
-# LINE Notify Token (optional - get from https://notify-bot.line.me/)
-LINE_NOTIFY_TOKEN=
-
-# Email Configuration (optional - for Gmail use App Password)
-EMAIL_HOST=xxxxx@gmail.com
-EMAIL_PORT=587
-EMAIL_USER=
-EMAIL_PASS=
-
-# Server Configuration
-PORT=5000
-CLIENT_URL=http://localhost:5173
-#CLIENT_URL=https://relying-memo-reforms-declaration.trycloudflare.com/
-DISCORD_WEBHOOK_URL=
-```
+> [!TIP]
+> You can now manage IT Staff accounts directly through the **"Staff User"** menu in the Navbar when logged in as an admin!
 
 ## 📁 Project Structure
 
@@ -127,207 +85,51 @@ DISCORD_WEBHOOK_URL=
 itsupport_system/
 ├── backend/
 │   ├── src/
-│   │   ├── config/         # Database config
-│   │   ├── controllers/    # Route controllers
-│   │   │   ├── assets.js       # Asset CRUD + assignment + maintenance
-│   │   │   ├── licenses.js     # Software license management
-│   │   │   ├── inventory.js    # Inventory/stock management
-│   │   │   ├── tickets.js      # Ticket management
-│   │   │   ├── auth.js         # Authentication
-│   │   │   ├── chat.js         # Real-time chat
-│   │   │   ├── feedback.js     # Customer feedback
-│   │   │   ├── knowledgeBase.js # KB articles
-│   │   │   └── notifications.js # In-app notifications
-│   │   ├── middleware/     # Auth middleware
-│   │   ├── models/
-│   │   │   ├── index.js        # Ticket/Chat/User models
-│   │   │   └── assetModels.js  # All ITAM models
-│   │   ├── routes/
-│   │   │   ├── assets.js       # /api/assets routes
-│   │   │   ├── licenses.js     # /api/licenses routes
-│   │   │   ├── inventory.js    # /api/inventory routes
-│   │   │   └── ...             # Existing routes
-│   │   ├── services/       # Email & LINE Notify
-│   │   └── server.js       # Main server file
-│   ├── uploads/            # Uploaded images
-│   ├── itam_migration.sql  # ITAM database migration
+│   │   ├── config/         # Firebase Admin SDK config
+│   │   ├── controllers/    # Route controllers (Tickets, Users, Assets, etc.)
+│   │   ├── routes/         # Express routes (including /api/users)
+│   │   ├── models/         # Firestore model abstraction layer
+│   │   └── server.js       # Express + Socket.io entry point
+│   ├── serviceAccountKey.json # REQUIRED: Firebase auth file
 │   └── package.json
 ├── frontend/
 │   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── contexts/       # Auth context
-│   │   ├── pages/
-│   │   │   ├── AssetList.jsx       # Asset registry with filters
-│   │   │   ├── AssetDetail.jsx     # Asset detail (tabbed)
-│   │   │   ├── AssetDashboard.jsx  # ITAM dashboard & charts
-│   │   │   ├── LicenseList.jsx     # License management
-│   │   │   ├── InventoryList.jsx   # Inventory/consumables
-│   │   │   └── ...                 # Existing pages
-│   │   └── App.jsx         # Main app with routes
+│   │   ├── components/     # UI Components, Navbar, Layout, QR Code
+│   │   ├── pages/          # ManageUsers.jsx, CreateTicket.jsx, etc.
+│   │   └── contexts/       # Auth & Theme (Dark Mode) Contexts
 │   └── package.json
 └── README.md
 ```
 
-## 🔌 API Endpoints
-
-### Authentication
-- `POST /api/auth/login` - Login user
-- `GET /api/auth/me` - Get current user
-
-### Tickets
-- `POST /api/tickets` - Create new ticket (public)
-- `GET /api/tickets` - List all tickets (protected)
-- `GET /api/tickets/search/:id` - Get ticket by ID
-- `PATCH /api/tickets/:id` - Update ticket (protected)
-- `GET /api/tickets/stats/dashboard` - Get statistics (manager only)
-
-### Chat
-- `GET /api/tickets/:id/messages` - Get messages
-- `POST /api/tickets/:id/messages` - Send message
-
-### Assets (ITAM) 🆕
-- `GET /api/assets` - List all assets (filters: status, category_id, location_id, search)
-- `POST /api/assets` - Create asset
-- `GET /api/assets/:id` - Get asset detail (includes assignments, maintenance, tickets, logs)
-- `PUT /api/assets/:id` - Update asset
-- `DELETE /api/assets/:id` - Delete asset (Manager only)
-- `POST /api/assets/:id/assign` - Assign asset to user
-- `POST /api/assets/:id/return` - Return asset
-- `POST /api/assets/:id/maintenance` - Create maintenance record
-- `PATCH /api/assets/maintenance/:id` - Update maintenance status
-- `GET /api/assets/:id/history` - Get asset audit log
-- `GET /api/assets/stats/dashboard` - Asset statistics
-- `GET /api/assets/categories` - Asset categories
-- `GET /api/assets/categories/:id/subcategories` - Asset subcategories
-- `GET /api/assets/vendors` - Vendors list
-- `POST /api/assets/vendors` - Create vendor (Manager only)
-- `GET /api/assets/locations` - Locations list
-
-### Software Licenses (ITAM) 🆕
-- `GET /api/licenses` - List all licenses
-- `POST /api/licenses` - Create license
-- `GET /api/licenses/:id` - Get license detail with assignments
-- `PUT /api/licenses/:id` - Update license
-- `DELETE /api/licenses/:id` - Delete license (Manager only)
-- `POST /api/licenses/assign` - Assign license (with seat validation)
-- `POST /api/licenses/revoke/:id` - Revoke license assignment
-- `GET /api/licenses/expiring` - Licenses expiring in 30 days
-
-### Inventory (ITAM) 🆕
-- `GET /api/inventory` - List all inventory items
-- `POST /api/inventory` - Create inventory item
-- `PUT /api/inventory/:id` - Update inventory item
-- `DELETE /api/inventory/:id` - Delete item (Manager only)
-- `GET /api/inventory/low-stock` - Items below reorder level
-
-## 🌐 Routes
-
-### Public
-- `/` - Create ticket form
-- `/ticket/:id` - View ticket and chat
-- `/knowledge-base` - FAQ articles
-
-### Admin
-- `/login` - Staff login
-- `/dashboard` - Manager dashboard (tickets)
-- `/tickets` - All tickets list
-- `/admin/ticket/:id` - Ticket detail (staff)
-- `/admin/kb` - Manage KB articles
-
-### ITAM (Protected) 🆕
-- `/assets` - Asset registry with filters & search
-- `/assets/:id` - Asset detail (tabs: Info, Assignments, Maintenance, Tickets, Audit Log)
-- `/assets/dashboard` - ITAM dashboard with charts & alerts
-- `/licenses` - Software license management
-- `/inventory` - Inventory & consumables
-
-## 🔔 Notification System
-
-### LINE Notify
-- Triggers on new ticket creation
-- Triggers on new user message
-- Requires LINE_NOTIFY_TOKEN
-
-### Email Notifications
-- Triggers on new ticket creation
-- Triggers on ticket updates
-- Requires SMTP configuration
-
-## 📦 Production Deployment
-
-1. **Build the frontend**:
-```bash
-cd frontend
-npm run build
-```
-
-2. **Set production environment variables** in backend/.env
-
-3. **Start the backend**:
-```bash
-cd backend
-npm start
-```
-
-## 🛠️ Features
+## 🛠️ Key Features
 
 ### Ticket Support System
-- ✅ Create tickets with multiple image uploads
-- ✅ Real-time chat with Socket.io
-- ✅ JWT-based authentication
-- ✅ Role-based access control
-- ✅ Ticket status and priority management
-- ✅ Ticket assignment to staff
-- ✅ Dashboard with charts and statistics
-- ✅ LINE Notify integration
-- ✅ Email notifications
-- ✅ Responsive UI with TailwindCSS
-- ✅ Image preview and modal
-- ✅ **Enterprise V2:** Ticket Categories & Subcategories
-- ✅ **Enterprise V2:** Service Level Agreement (SLA) Tracking
-- ✅ **Enterprise V2:** Interactive Internal Staff Notes
-- ✅ **Enterprise V2:** Detailed Activity & Audit Logs
-- ✅ **Enterprise V2:** In-app Notification System
-- ✅ **Enterprise V2:** Customer Feedback & Rating System
-- ✅ **Enterprise V2:** Knowledge Base System
-- ✅ **New:** Detailed Activity Logging (Captures User IP, Browser, Device, OS)
-- ✅ **New:** Manual Computer Name / PC Name field (with Auto-fill memory)
-- ✅ **New:** "Recent Tickets" list on Home Page for easy tracking
+- ✅ **New: AnyDesk ID Support** (Optional field for remote assistance)
+- ✅ **New: Ticket QR Code** (Scan to open ticket status on mobile)
+- ✅ **New: Staff Management UI** (Add/Delete IT staff accounts via web)
+- ✅ **New: Standardized Thai Date Format** (Correct พ.ศ. display everywhere)
+- ✅ Real-time chat with Socket.io & Audio alerts (.m4a)
+- ✅ Multiple image uploads with preview modal
+- ✅ In-app notification system
+- ✅ Customer feedback & rating system
+- ✅ Knowledge Base articles with centralized search
 
-### IT Asset Management (ITAM) 🆕
-- ✅ Asset Master Registry (CRUD with auto-generated codes)
-- ✅ Asset Categories & Subcategories
-- ✅ Asset Assignment (Check-in / Check-out)
-- ✅ Asset Transfer & Return tracking
-- ✅ Full Asset Audit Log (all actions tracked)
-- ✅ Maintenance & Repair tracking with cost
-- ✅ Link Assets to Tickets
+### IT Asset Management (ITAM)
+- ✅ Asset Master Registry with Check-in/Check-out
 - ✅ Software License Management (seat-aware)
-- ✅ License Assignment & Revocation
-- ✅ Over-allocation prevention
-- ✅ Inventory & Consumable Stock tracking
-- ✅ Low Stock Alerts
-- ✅ Vendor Management
-- ✅ Multi-location/Branch Support
-- ✅ ITAM Dashboard with Charts & KPIs
-- ✅ Warranty Expiry Alerts
-- ✅ License Expiry Alerts
-- ✅ Top Problematic Assets Report
-- ✅ Maintenance Cost Summary
-- ✅ QR Code generation per asset
-- ✅ Role-based Security (Manager full / IT limited)
-- ✅ **New:** Standardized Searchable Comboboxes (iOS/Safari Compatible)
-- ✅ **New:** Smart "Auto-Learn" (Automatic Vendor/Location creation on-the-fly)
-- ✅ **New:** Real-time Audio Alerts for Chat messages (.m4a)
-- ✅ **New:** Copy Ticket Link with visual confirmation
+- ✅ Consumable Inventory & Low Stock Alerts
+- ✅ Asset Maintenance & Repair history
+- ✅ Smart "Auto-Learn" for Vendors & Locations
+- ✅ QR Code generation per asset record
 
-## 🗄️ Database Tables
+## 🔔 Notifications
+- **Discord Integration**: Automated notifications for new tickets & updates
+- **Timeline Logs**: Full audit trail of every ticket action
 
-### Existing (Tickets)
-- `users`, `tickets`, `ticket_images`, `chat_messages`
-- `categories`, `subcategories`
-- `ticket_internal_notes`, `ticket_activity_logs`
-- `user_notifications`, `ticket_feedback`
+## 📝 License
+
+MIT License
+otifications`, `ticket_feedback`
 - `knowledge_base_articles`
 
 ### ITAM (New) 🆕

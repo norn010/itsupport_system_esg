@@ -101,6 +101,8 @@ const AssetList = () => {
         }
       })
       // Auto-create names if IDs missing
+      if (!formData.category_id && catSearch) data.append('category_name', catSearch);
+      if (!formData.subcategory_id && subSearch) data.append('subcategory_name', subSearch);
       if (!formData.vendor_id && venSearch) data.append('vendor_name', venSearch);
       if (!formData.location_id && locSearch) data.append('location_name', locSearch);
       

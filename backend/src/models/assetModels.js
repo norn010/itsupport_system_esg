@@ -13,9 +13,13 @@ const timestamp = () => new Date();
 // ===========================================================================
 export const Asset = {
   async create(data) {
+    const docData = { ...data };
+    if (typeof docData.purchase_date === 'string') docData.purchase_date = new Date(docData.purchase_date);
+    if (typeof docData.warranty_expiry === 'string') docData.warranty_expiry = new Date(docData.warranty_expiry);
+
     const docRef = await db.collection('assets').add({
-      ...data,
-      status: data.status || 'Available',
+      ...docData,
+      status: docData.status || 'Available',
       created_at: timestamp(),
       updated_at: timestamp()
     });
@@ -113,8 +117,14 @@ export const Asset = {
 
   async update(id, updates) {
     const docRef = db.collection('assets').doc(id.toString());
+    const cleanUpdates = { ...updates };
+    
+    // Convert date strings
+    if (typeof cleanUpdates.purchase_date === 'string') cleanUpdates.purchase_date = new Date(cleanUpdates.purchase_date);
+    if (typeof cleanUpdates.warranty_expiry === 'string') cleanUpdates.warranty_expiry = new Date(cleanUpdates.warranty_expiry);
+
     await docRef.update({
-      ...updates,
+      ...cleanUpdates,
       updated_at: timestamp()
     });
     const snap = await docRef.get();
@@ -162,13 +172,21 @@ export const Asset = {
       return { name: doc.data().name, count };
     }));
 
-    // Warranty expiring in 30 days
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
     const now = new Date();
+
+    const formatDate = (val) => {
+      if (!val) return null;
+      return val.toDate ? val.toDate() : new Date(val);
+    };
+
     const warrantyExpiring = assets
-      .filter(a => a.warranty_expiry && a.warranty_expiry.toDate() <= thirtyDaysFromNow && a.warranty_expiry.toDate() >= now)
-      .map(a => ({ ...a, warranty_expiry: a.warranty_expiry.toDate() }));
+      .filter(a => {
+        const d = formatDate(a.warranty_expiry);
+        return d && d <= thirtyDaysFromNow && d >= now;
+      })
+      .map(a => ({ ...a, warranty_expiry: formatDate(a.warranty_expiry) }));
 
     const maintSnap = await db.collection('asset_maintenance').get();
     const maintenance = maintSnap.docs.map(d => d.data());
@@ -211,8 +229,6 @@ export const AssetAssignment = {
     const snap = await db.collection('asset_assignments')
       .where('asset_id', '==', assetId.toString())
       .where('returned_at', '==', null)
-      .orderBy('assigned_at', 'desc')
-      .limit(1)
       .get();
     if (snap.empty) return null;
     const a = toObj(snap.docs[0]);
@@ -226,9 +242,9 @@ export const AssetAssignment = {
   async findHistoryByAsset(assetId) {
     const snap = await db.collection('asset_assignments')
       .where('asset_id', '==', assetId.toString())
-      .orderBy('assigned_at', 'desc')
       .get();
-    return await Promise.all(snap.docs.map(async (doc) => {
+    
+    const results = await Promise.all(snap.docs.map(async (doc) => {
       const a = toObj(doc);
       if (a.assigned_by) {
         const userDoc = await db.collection('users').doc(a.assigned_by.toString()).get();
@@ -236,6 +252,8 @@ export const AssetAssignment = {
       }
       return a;
     }));
+
+    return results.sort((a, b) => (b.assigned_at?.toDate?.() || 0) - (a.assigned_at?.toDate?.() || 0));
   }
 };
 
@@ -255,10 +273,10 @@ export const AssetLog = {
   async findByAsset(assetId, limit = 50) {
     const snap = await db.collection('asset_logs')
       .where('asset_id', '==', assetId.toString())
-      .orderBy('created_at', 'desc')
-      .limit(limit)
       .get();
-    return snap.docs.map(doc => toObj(doc));
+    
+    const logs = snap.docs.map(doc => toObj(doc));
+    return logs.sort((a,b) => (b.created_at?.toDate?.() || 0) - (a.created_at?.toDate?.() || 0)).slice(0, limit);
   }
 };
 
@@ -279,9 +297,9 @@ export const AssetMaintenance = {
   async findByAsset(assetId) {
     const snap = await db.collection('asset_maintenance')
       .where('asset_id', '==', assetId.toString())
-      .orderBy('created_at', 'desc')
       .get();
-    return await Promise.all(snap.docs.map(async (doc) => {
+
+    const results = await Promise.all(snap.docs.map(async (doc) => {
       const m = toObj(doc);
       if (m.vendor_id) {
         const vDoc = await db.collection('vendors').doc(m.vendor_id.toString()).get();
@@ -293,6 +311,8 @@ export const AssetMaintenance = {
       }
       return m;
     }));
+
+    return results.sort((a, b) => (b.created_at?.toDate?.() || 0) - (a.created_at?.toDate?.() || 0));
   },
 
   async update(id, updates) {
@@ -311,6 +331,20 @@ export const AssetCategory = {
     const snap = await db.collection('asset_categories').where('is_active', '==', true).orderBy('name').get();
     return snap.docs.map(doc => toObj(doc));
   },
+  async findOrCreateByName(name) {
+    const snap = await db.collection('asset_categories').where('name', '==', name.trim()).get();
+    if (!snap.empty) return toObj(snap.docs[0]);
+    return await this.create({ name: name.trim() });
+  },
+  async create(data) {
+    const docRef = await db.collection('asset_categories').add({
+      ...data,
+      is_active: true,
+      created_at: timestamp()
+    });
+    const snap = await docRef.get();
+    return toObj(snap);
+  },
   async findSubcategories(categoryId) {
     const snap = await db.collection('asset_subcategories')
       .where('category_id', '==', categoryId.toString())
@@ -318,6 +352,22 @@ export const AssetCategory = {
       .orderBy('name')
       .get();
     return snap.docs.map(doc => toObj(doc));
+  },
+  async findOrCreateSubcategoryByName(categoryId, name) {
+    const snap = await db.collection('asset_subcategories')
+      .where('category_id', '==', categoryId.toString())
+      .where('name', '==', name.trim())
+      .get();
+    if (!snap.empty) return toObj(snap.docs[0]);
+    
+    const docRef = await db.collection('asset_subcategories').add({
+      category_id: categoryId.toString(),
+      name: name.trim(),
+      is_active: true,
+      created_at: timestamp()
+    });
+    const result = await docRef.get();
+    return toObj(result);
   }
 };
 
@@ -333,6 +383,11 @@ export const Vendor = {
     const snap = await db.collection('vendors').where('name', '==', name.trim()).get();
     if (snap.empty) return null;
     return toObj(snap.docs[0]);
+  },
+  async findOrCreateByName(name) {
+    const existing = await this.findByName(name);
+    if (existing) return existing;
+    return await this.create({ name });
   },
   async create(data) {
     const docRef = await db.collection('vendors').add({
@@ -358,6 +413,11 @@ export const Location = {
     const snap = await db.collection('locations').where('name', '==', name.trim()).get();
     if (snap.empty) return null;
     return toObj(snap.docs[0]);
+  },
+  async findOrCreateByName(name) {
+    const existing = await this.findByName(name);
+    if (existing) return existing;
+    return await this.create({ name });
   },
   async create(data) {
     const docRef = await db.collection('locations').add({
@@ -456,12 +516,20 @@ export const SoftwareLicense = {
   },
 
   async getExpiringLicenses() {
-    // Similar to warranty logic
     const thirtyDays = new Date(); thirtyDays.setDate(thirtyDays.getDate() + 30);
     const snap = await db.collection('software_licenses').get();
+    
+    const formatDate = (val) => {
+      if (!val) return null;
+      return val.toDate ? val.toDate() : new Date(val);
+    };
+
     return snap.docs
       .map(d => toObj(d))
-      .filter(l => l.expiry_date && l.expiry_date.toDate() <= thirtyDays);
+      .filter(l => {
+        const d = formatDate(l.expiry_date);
+        return d && d <= thirtyDays;
+      });
   }
 };
 
@@ -516,12 +584,14 @@ export const TicketAsset = {
   async findTicketsByAsset(assetId) {
     const snap = await db.collection('tickets')
       .where('asset_id', '==', assetId.toString())
-      .orderBy('created_at', 'desc')
       .get();
-    return snap.docs.map(doc => {
+      
+    const tickets = snap.docs.map(doc => {
       const t = doc.data();
       return { id: doc.id, ticket_id: t.ticket_id, issue_title: t.issue_title, status: t.status, priority: t.priority, created_at: t.created_at };
     });
+
+    return tickets.sort((a,b) => (b.created_at?.toDate?.() || 0) - (a.created_at?.toDate?.() || 0));
   },
 
   async linkAssetToTicket(ticketId, assetId) {

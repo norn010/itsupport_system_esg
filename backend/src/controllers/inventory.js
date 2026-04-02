@@ -1,9 +1,17 @@
-import { InventoryItem } from '../models/assetModels.js';
+import { InventoryItem, Location } from '../models/assetModels.js';
 
 export const createInventoryItem = async (req, res) => {
   try {
-    if (!req.body.name) return res.status(400).json({ message: 'Item name is required' });
-    const item = await InventoryItem.create(req.body);
+    const data = { ...req.body };
+    if (!data.name) return res.status(400).json({ message: 'Item name is required' });
+
+    if (data.location_name) {
+      const l = await Location.findOrCreateByName(data.location_name);
+      data.location_id = l.id;
+      delete data.location_name;
+    }
+
+    const item = await InventoryItem.create(data);
     res.status(201).json({ message: 'Inventory item created', item });
   } catch (error) {
     console.error('Create inventory error:', error);
@@ -23,7 +31,14 @@ export const getInventoryItems = async (req, res) => {
 
 export const updateInventoryItem = async (req, res) => {
   try {
-    const updated = await InventoryItem.update(req.params.id, req.body);
+    const data = { ...req.body };
+    if (data.location_name) {
+      const l = await Location.findOrCreateByName(data.location_name);
+      data.location_id = l.id;
+      delete data.location_name;
+    }
+
+    const updated = await InventoryItem.update(req.params.id, data);
     if (!updated) return res.status(404).json({ message: 'Item not found' });
     res.json({ message: 'Item updated', item: updated });
   } catch (error) {
