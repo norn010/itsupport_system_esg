@@ -9,18 +9,24 @@ export const getArticles = async (req, res) => {
   try {
     const { categoryId, search, isAdmin } = req.query;
     
-    let query = db.collection('knowledge_base_articles');
+    const snap = await db.collection('knowledge_base_articles').get();
+    let articles = snap.docs.map(doc => toObj(doc));
 
+    // In-memory filter and sort
     if (isAdmin !== 'true') {
-      query = query.where('is_published', '==', true);
+      articles = articles.filter(a => a.is_published === true);
     }
 
     if (categoryId) {
-      query = query.where('category_id', '==', categoryId);
+      articles = articles.filter(a => a.category_id === categoryId);
     }
 
-    const snap = await query.orderBy('created_at', 'desc').get();
-    let articles = snap.docs.map(doc => toObj(doc));
+    // Sort by created_at descending
+    articles.sort((a, b) => {
+      const dateA = a.created_at?.toDate ? a.created_at.toDate() : new Date(a.created_at || 0);
+      const dateB = b.created_at?.toDate ? b.created_at.toDate() : new Date(b.created_at || 0);
+      return dateB - dateA;
+    });
 
     if (search) {
       const ls = search.toLowerCase();

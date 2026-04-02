@@ -18,6 +18,7 @@ import LicenseList from './pages/LicenseList'
 import InventoryList from './pages/InventoryList'
 import Home from './pages/Home'
 import QueueTicket from './pages/QueueTicket'
+import ManageUsers from './pages/ManageUsers'
 
 function App() {
   const { user } = useAuth()
@@ -54,6 +55,11 @@ function App() {
         <Route path="/admin/kb" element={
           <Layout requireAuth>
             <ManageArticles />
+          </Layout>
+        } />
+        <Route path="/admin/users" element={
+          <Layout requireAuth>
+            <ManageUsers />
           </Layout>
         } />
 

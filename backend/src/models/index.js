@@ -127,12 +127,16 @@ export const Ticket = {
 
   async update(id, updates) {
     const docRef = db.collection('tickets').doc(id.toString());
+    const cleanUpdates = {};
+    Object.keys(updates).forEach(key => {
+      if (updates[key] !== undefined) cleanUpdates[key] = updates[key];
+    });
+    
     await docRef.update({
-      ...updates,
+      ...cleanUpdates,
       updated_at: timestamp()
     });
-    const snap = await docRef.get();
-    return toObj(snap);
+    return this.findById(id);
   },
 
   async getDepartments() {
@@ -187,19 +191,22 @@ export const Ticket = {
       return { name: cat.name, value: countSnap.size };
     }));
 
-    // SLA Metrics
-    const slaMetrics = {
-      met: tickets.filter(t => ['Resolved', 'Closed'].includes(t.status) && (!t.due_date || t.resolved_at <= t.due_date)).length,
-      missed: tickets.filter(t => ['Resolved', 'Closed'].includes(t.status) && t.due_date && t.resolved_at > t.due_date).length,
-      overdue_active: tickets.filter(t => !['Resolved', 'Closed'].includes(t.status) && t.due_date && new Date() > new Date(t.due_date)).length
-    };
+    // By department (branch)
+    const deptMap = {};
+    tickets.forEach(t => {
+      const dept = t.department || 'ไม่ระบุ';
+      deptMap[dept] = (deptMap[dept] || 0) + 1;
+    });
+    const byDepartment = Object.entries(deptMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
 
     return {
       overview: stats,
       daily,
       byStaff,
       byCategory,
-      slaMetrics
+      byDepartment,
     };
   }
 };
@@ -263,6 +270,29 @@ export const User = {
     return { id, username: u.username, role: u.role, email: u.email, full_name: u.full_name, created_at: u.created_at };
   },
 
+  async create(data) {
+    const docRef = db.collection('users').doc(data.username);
+    await docRef.set({
+      ...data,
+      created_at: timestamp()
+    });
+    const snap = await docRef.get();
+    return toObj(snap);
+  },
+
+  async findAll() {
+    const snap = await db.collection('users').get();
+    return snap.docs.map(doc => {
+      const data = doc.data();
+      delete data.password;
+      return { id: doc.id, ...data };
+    });
+  },
+
+  async delete(id) {
+    await db.collection('users').doc(id.toString()).delete();
+  },
+
   async findAllITStaff() {
     const snap = await db.collection('users').where('role', 'in', ['IT', 'MANAGER']).get();
     return snap.docs.map(doc => ({
@@ -277,16 +307,19 @@ export const User = {
 
 export const Category = {
   async findAll() {
-    const snap = await db.collection('categories').where('is_active', '==', true).orderBy('name', 'asc').get();
-    return snap.docs.map(doc => toObj(doc));
+    const snap = await db.collection('categories').get();
+    const categories = snap.docs.map(doc => toObj(doc))
+      .filter(c => c && c.is_active !== false); // Default to true if missing or true
+    return categories.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   },
 
   async findSubcategories(categoryId) {
+    if (!categoryId) return [];
     const snap = await db.collection('subcategories')
-      .where('category_id', '==', categoryId)
-      .where('is_active', '==', true)
-      .orderBy('name', 'asc').get();
-    return snap.docs.map(doc => toObj(doc));
+      .where('category_id', '==', categoryId).get();
+    const subcategories = snap.docs.map(doc => toObj(doc))
+      .filter(sc => sc && sc.is_active !== false);
+    return subcategories.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   },
 
   async findOrCreateByName(name) {

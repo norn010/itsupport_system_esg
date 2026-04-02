@@ -1,4 +1,4 @@
-import { Ticket, TicketImage, ChatMessage, User } from '../models/index.js';
+import { Ticket, TicketImage, ChatMessage, User, Category } from '../models/index.js';
 import { sendTicketNotification, sendMessageNotification } from '../services/email.js';
 import { sendLineNotification } from '../services/lineNotify.js';
 import { sendDiscordNotification } from '../services/discordNotify.js';
@@ -16,7 +16,7 @@ const generateTicketId = () => {
 
 export const createTicket = async (req, res) => {
   try {
-    const { name, department, issue_title, description, priority = 'Medium', category_id, subcategory_id, asset_id } = req.body;
+    const { name, department, issue_title, description, priority = 'Medium', category_id, subcategory_id, asset_id, anydesk_id } = req.body;
 
     if (!name || !issue_title) {
       return res.status(400).json({ message: 'Name and issue title are required' });
@@ -34,10 +34,11 @@ export const createTicket = async (req, res) => {
       issue_title,
       description,
       priority,
-      category_id: category_id ? parseInt(category_id) : null,
-      subcategory_id: subcategory_id ? parseInt(subcategory_id) : null,
+      category_id: category_id || null,
+      subcategory_id: subcategory_id || null,
       due_date,
-      asset_id: asset_id ? parseInt(asset_id) : null,
+      asset_id: asset_id || null,
+      anydesk_id: anydesk_id || null,
       metadata
     });
 
@@ -118,20 +119,20 @@ export const getTicketById = async (req, res) => {
 export const updateTicket = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, assigned_to, priority, category_id, subcategory_id, asset_id } = req.body;
+    const { category_name, subcategory_name, category_id, subcategory_id, asset_id, status, assigned_to, priority } = req.body;
 
-    const ticket = await Ticket.findById(id);
+    const ticket = await Ticket.findByTicketId(id);
     if (!ticket) {
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
     const updates = {};
+    const docId = ticket.id; // The actual Firestore Document ID
     if (status) updates.status = status;
     if (assigned_to !== undefined) updates.assigned_to = assigned_to || null;
     if (priority) updates.priority = priority;
     
     // Category management (combobox support)
-    const { category_name, subcategory_name } = req.body;
     if (category_name !== undefined) {
       if (!category_name) {
         updates.category_id = null;
@@ -150,7 +151,7 @@ export const updateTicket = async (req, res) => {
         }
       }
     } else if (category_id !== undefined) {
-      updates.category_id = category_id ? parseInt(category_id) : null;
+      updates.category_id = category_id || null;
     }
 
     if (subcategory_name !== undefined && category_name === undefined) {
@@ -162,7 +163,7 @@ export const updateTicket = async (req, res) => {
         updates.subcategory_id = sub.id;
       }
     } else if (subcategory_id !== undefined && category_name === undefined) {
-      updates.subcategory_id = subcategory_id ? parseInt(subcategory_id) : null;
+      updates.subcategory_id = subcategory_id || null;
     }
 
     if (asset_id !== undefined) updates.asset_id = asset_id || null;
@@ -195,7 +196,7 @@ export const updateTicket = async (req, res) => {
       updates.resolved_at = new Date();
     }
 
-    const updatedTicket = await Ticket.update(id, updates);
+    const updatedTicket = await Ticket.update(docId, updates);
 
     // Send notifications
     await sendTicketNotification(updatedTicket, 'updated');

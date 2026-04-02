@@ -19,6 +19,7 @@ import notificationRoutes from './routes/notifications.js';
 import assetRoutes from './routes/assets.js';
 import licenseRoutes from './routes/licenses.js';
 import inventoryRoutes from './routes/inventory.js';
+import userRoutes from './routes/users.js';
 import { ChatMessage } from './models/index.js';
 
 dotenv.config();
@@ -64,6 +65,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/licenses', licenseRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/users', userRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

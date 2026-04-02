@@ -31,6 +31,23 @@ const ActivityTimeline = ({ ticketId }) => {
     }
   };
 
+  const formatDate = (dateInput) => {
+    if (!dateInput) return '-';
+    // Handle Firestore Timestamp { _seconds, _nanoseconds }
+    if (dateInput && typeof dateInput === 'object' && dateInput._seconds) {
+      return new Date(dateInput._seconds * 1000).toLocaleString('th-TH', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return '-';
+    return date.toLocaleString('th-TH', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    });
+  };
+
   if (loading) return <div className="text-center py-4 text-sm text-slate-500 dark:text-slate-400">Loading timeline...</div>;
 
   if (activities.length === 0) return <div className="text-sm text-slate-500 dark:text-slate-400 italic mt-4">No activity recorded yet.</div>;
@@ -57,9 +74,12 @@ const ActivityTimeline = ({ ticketId }) => {
                 <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">
                   {log.description}
                 </span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  {new Date(log.created_at).toLocaleString()}
-                </span>
+                <div className="text-right flex flex-col items-end shrink-0">
+                  <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest leading-none mb-1">Activity Log</span>
+                  <span className="text-xs font-bold text-slate-400">
+                    {formatDate(log.created_at)}
+                  </span>
+                </div>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
                 <span>By: <span className="font-medium text-slate-700 dark:text-slate-300">{log.actor_name}</span> ({log.actor_type})</span>

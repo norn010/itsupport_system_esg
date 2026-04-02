@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import axios from 'axios'
+import { QRCodeSVG } from 'qrcode.react'
 import { useAuth } from '../contexts/AuthContext'
 import InternalNotes from '../components/InternalNotes'
 import ActivityTimeline from '../components/ActivityTimeline'
@@ -20,6 +21,7 @@ const TicketDetail = () => {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [selectedImage, setSelectedImage] = useState(null)
+  const [showQR, setShowQR] = useState(false)
   const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
   const [isTyping, setIsTyping] = useState(false)
@@ -251,10 +253,23 @@ const TicketDetail = () => {
 
   useEffect(() => {
     if (ticket) {
-      setCatName(ticket.category_name || '')
-      setSubCatName(ticket.subcategory_name || '')
+      if (categories.length > 0) {
+        const currentCat = categories.find(c => String(c.id) === String(ticket.category_id));
+        if (currentCat) setCatName(currentCat.name);
+        else if (ticket.category_name) setCatName(ticket.category_name);
+      } else if (ticket.category_name) {
+        setCatName(ticket.category_name);
+      }
+      
+      if (subcategories.length > 0) {
+        const currentSub = subcategories.find(sc => String(sc.id) === String(ticket.subcategory_id));
+        if (currentSub) setSubCatName(currentSub.name);
+        else if (ticket.subcategory_name) setSubCatName(ticket.subcategory_name);
+      } else if (ticket.subcategory_name) {
+        setSubCatName(ticket.subcategory_name);
+      }
     }
-  }, [ticket?.id, ticket?.category_id, ticket?.subcategory_id])
+  }, [ticket?.id, ticket?.category_id, ticket?.subcategory_id, categories, subcategories])
 
   const fetchTicket = async () => {
     try {
@@ -283,8 +298,23 @@ const TicketDetail = () => {
 
   const handleUpdateTicket = async (updates) => {
     try {
-      const response = await axios.patch(`/api/tickets/${ticket.id}`, updates)
-      setTicket(response.data.ticket)
+      const response = await axios.patch(`/api/tickets/${id}`, updates)
+      const updated = response.data.ticket
+      setTicket(updated)
+      
+      // Refresh local names immediately
+      if (updated.category_name) setCatName(updated.category_name)
+      if (updated.subcategory_name) setSubCatName(updated.subcategory_name)
+
+      // Refresh lists if new items were created by name
+      if (updates.category_name) {
+        await fetchCategories()
+      }
+      if (updates.subcategory_name || updates.category_name || updates.category_id) {
+        if (updated.category_id) {
+          await fetchSubcategories(updated.category_id)
+        }
+      }
     } catch (error) {
       console.error('Error updating ticket:', error)
     }
@@ -387,6 +417,24 @@ const TicketDetail = () => {
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in duration-500">
+      {/* QR Code Modal */}
+      {showQR && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={() => setShowQR(false)}>
+          <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col items-center gap-4 border border-white" onClick={e => e.stopPropagation()}>
+            <div className="w-16 h-1 w-16 bg-slate-100 rounded-full mb-2"></div>
+            <h3 className="text-2xl font-black text-slate-900">Ticket QR Code</h3>
+            <p className="text-slate-500 text-sm mb-2">Scan to access this ticket on mobile</p>
+            <div className="p-6 bg-white border-[12px] border-slate-50 rounded-[2rem] shadow-inner">
+              <QRCodeSVG value={window.location.href} size={240} />
+            </div>
+            <div className="mt-4 flex flex-col items-center">
+               <span className="text-xs font-black text-primary-600 uppercase tracking-widest bg-primary-50 px-3 py-1 rounded-full mb-1">{ticket.ticket_id}</span>
+            </div>
+            <button onClick={() => setShowQR(false)} className="mt-6 btn-secondary w-full py-4 rounded-2xl text-base font-bold">Close Window</button>
+          </div>
+        </div>
+      )}
+
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
@@ -425,6 +473,14 @@ const TicketDetail = () => {
               </>
             )}
           </button>
+          <button 
+            onClick={() => setShowQR(true)}
+            className="p-2.5 bg-white text-slate-500 border border-slate-200 rounded-xl hover:border-primary-500 hover:text-primary-600 transition-all shadow-sm"
+            title="View QR Code"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
+          </button>
+          
           <Link to="/tickets" className="btn-secondary flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             <span className="hidden xs:inline">Back to List</span>
@@ -568,8 +624,8 @@ const TicketDetail = () => {
                       }`}>
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-[11px] font-bold uppercase tracking-wider opacity-80">{msg.sender_name}</span>
-                          <span className="text-[11px] opacity-60 font-medium">
-                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          <span className="text-[11px] opacity-60 font-medium whitespace-nowrap">
+                            {formatDate(msg.created_at)}
                           </span>
                         </div>
                         {msg.file_path && (
@@ -595,7 +651,9 @@ const TicketDetail = () => {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-bold truncate">{msg.file_path.split('/').pop()}</p>
-                                  <p className="text-[10px] opacity-70 font-bold uppercase tracking-widest">Download File</p>
+                                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 group-hover:text-indigo-400 transition-colors">
+                                    {formatDate(msg.created_at)}
+                                  </span>
                                 </div>
                                 <svg className="w-5 h-5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12V4m0 0l3 3m-3-3L9 7"></path></svg>
                               </a>
@@ -690,7 +748,7 @@ const TicketDetail = () => {
         <div className="space-y-6">
           
           {/* Status & Assignment Card */}
-          <div className="card shadow-md border-primary-100 bg-white ring-1 ring-primary-50">
+          <div className={`card shadow-md border-primary-100 bg-white ring-1 ring-primary-50 transition-all duration-300 ${(catDropdownOpen || subCatDropdownOpen) ? 'relative z-[100]' : 'relative'}`}>
             <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
               <span className="w-1.5 h-6 bg-primary-500 rounded-full"></span>
               Management
@@ -737,94 +795,137 @@ const TicketDetail = () => {
               </div>
 
               <div className="pt-6 border-t border-slate-100">
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1 mb-3">Classification</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1 mb-3">Categories</label>
                 <div className="space-y-4">
-                  {/* Category Dropdown */}
+                  {/* Category Combobox */}
                   <div className="space-y-1 relative">
-                    <div className="input-group">
+                    <div className="input-group group" onClick={() => setCatDropdownOpen(!catDropdownOpen)}>
                       <input 
-                        placeholder="Type or select Category"
+                        placeholder="Search or select Category"
                         value={catName} 
                         onChange={(e) => {
                           setCatName(e.target.value);
                           setCatDropdownOpen(true);
                         }}
                         onFocus={() => setCatDropdownOpen(true)}
-                        onBlur={(e) => {
-                          const val = e.target.value;
-                          if (val !== (ticket.category_name || '')) {
-                            handleUpdateTicket({ category_name: val });
+                        onBlur={() => {
+                          setTimeout(() => {
+                            setCatDropdownOpen(false);
+                          }, 200);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && catName.trim()) {
+                            handleUpdateTicket({ category_name: catName });
+                            setCatDropdownOpen(false);
                           }
                         }}
-                        className="input py-2.5 bg-slate-50 text-slate-700 border-slate-100 focus:bg-white transition-colors rounded-lg text-sm w-full pr-10"
+                        className="input py-2.5 bg-slate-50 text-slate-700 border-slate-100 focus:bg-white transition-colors rounded-lg text-sm w-full pr-10 cursor-pointer font-bold"
                       />
-                      <svg className={`dropdown-icon w-4 h-4 right-3 transition-transform ${catDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <svg className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${catDropdownOpen ? 'rotate-180 text-primary-500' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                      </div>
                     </div>
 
                     {catDropdownOpen && (
                       <>
-                        <div className="fixed inset-0 z-20" onClick={() => setCatDropdownOpen(false)}></div>
+                        <div className="fixed inset-0 z-20" onClick={(e) => { e.stopPropagation(); setCatDropdownOpen(false); }}></div>
                         <div className="absolute z-30 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
                           {categories.filter(c => c.name.toLowerCase().includes(catName.toLowerCase())).map(c => (
-                            <button
+                            <div
                               key={c.id}
-                              type="button"
-                              onClick={() => {
+                              onMouseDown={(e) => {
+                                e.preventDefault();
                                 setCatName(c.name);
                                 setCatDropdownOpen(false);
-                                handleUpdateTicket({ category_name: c.name });
+                                handleUpdateTicket({ category_id: c.id });
                               }}
-                              className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-xs font-bold border-b border-slate-50 last:border-0"
+                              className="w-full text-left px-4 py-2.5 hover:bg-primary-50 text-slate-700 text-[13px] font-bold border-b border-slate-50 last:border-0 cursor-pointer transition-colors"
                             >
                               {c.name}
-                            </button>
+                            </div>
                           ))}
+                          {categories.filter(c => c.name.toLowerCase().includes(catName.toLowerCase())).length === 0 && catName.trim() !== '' && (
+                            <div
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleUpdateTicket({ category_name: catName });
+                                setCatDropdownOpen(false);
+                              }}
+                              className="w-full text-left px-4 py-3 hover:bg-primary-50 text-primary-600 text-[13px] font-bold cursor-pointer transition-colors border-t border-slate-50 flex items-center gap-2 group"
+                            >
+                              <svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
+                              Add "{catName}"
+                            </div>
+                          )}
+                          {categories.filter(c => c.name.toLowerCase().includes(catName.toLowerCase())).length === 0 && catName.trim() === '' && (
+                            <div className="px-4 py-3 text-xs text-slate-400 italic">No categories found</div>
+                          )}
                         </div>
                       </>
                     )}
                   </div>
 
-                  {/* Subcategory Dropdown */}
+                  {/* Subcategory Combobox */}
                   <div className="space-y-1 relative">
-                    <div className="input-group">
+                    <div className="input-group group" onClick={() => ticket.category_id && setSubCatDropdownOpen(!subCatDropdownOpen)}>
                       <input 
-                        placeholder="Type or select Subcategory"
+                        placeholder="Search or select Subcategory"
                         value={subCatName} 
                         onChange={(e) => {
                           setSubCatName(e.target.value);
                           setSubCatDropdownOpen(true);
                         }}
                         onFocus={() => setSubCatDropdownOpen(true)}
-                        onBlur={(e) => {
-                          const val = e.target.value;
-                          if (val !== (ticket.subcategory_name || '')) {
-                            handleUpdateTicket({ subcategory_name: val });
+                        onBlur={() => {
+                          setTimeout(() => {
+                            setSubCatDropdownOpen(false);
+                          }, 200);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && subCatName.trim()) {
+                            handleUpdateTicket({ subcategory_name: subCatName });
+                            setSubCatDropdownOpen(false);
                           }
                         }}
-                        className="input py-2.5 bg-slate-50 text-slate-700 border-slate-100 focus:bg-white transition-colors rounded-lg text-sm w-full pr-10"
-                        disabled={!ticket.category_id && !catName}
+                        disabled={!ticket.category_id}
+                        className="input py-2.5 bg-slate-50 text-slate-700 border-slate-100 focus:bg-white transition-colors rounded-lg text-sm w-full pr-10 cursor-pointer font-bold disabled:opacity-50"
                       />
-                      <svg className={`dropdown-icon w-4 h-4 right-3 transition-transform ${subCatDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <svg className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${subCatDropdownOpen ? 'rotate-180 text-primary-500' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                      </div>
                     </div>
 
                     {subCatDropdownOpen && (
                       <>
-                        <div className="fixed inset-0 z-20" onClick={() => setSubCatDropdownOpen(false)}></div>
+                        <div className="fixed inset-0 z-20" onClick={(e) => { e.stopPropagation(); setSubCatDropdownOpen(false); }}></div>
                         <div className="absolute z-30 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
                           {subcategories.filter(sc => sc.name.toLowerCase().includes(subCatName.toLowerCase())).map(sc => (
-                            <button
+                            <div
                               key={sc.id}
-                              type="button"
-                              onClick={() => {
+                              onMouseDown={(e) => {
+                                e.preventDefault();
                                 setSubCatName(sc.name);
                                 setSubCatDropdownOpen(false);
-                                handleUpdateTicket({ subcategory_name: sc.name });
+                                handleUpdateTicket({ subcategory_id: sc.id });
                               }}
-                              className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-xs font-bold border-b border-slate-50 last:border-0"
+                              className="w-full text-left px-4 py-2.5 hover:bg-primary-50 text-slate-700 text-[13px] font-bold border-b border-slate-50 last:border-0 cursor-pointer transition-colors"
                             >
                               {sc.name}
-                            </button>
+                            </div>
                           ))}
+                          {subCatName.trim() !== '' && (
+                            <div
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleUpdateTicket({ subcategory_name: subCatName });
+                                setSubCatDropdownOpen(false);
+                              }}
+                              className="w-full text-left px-4 py-3 hover:bg-primary-50 text-primary-600 text-[13px] font-bold cursor-pointer transition-colors border-t border-slate-50 flex items-center gap-2 group"
+                            >
+                              <svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
+                              Add "{subCatName}"
+                            </div>
+                          )}
                         </div>
                       </>
                     )}
@@ -857,8 +958,17 @@ const TicketDetail = () => {
                 </div>
                 
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-400 font-medium">Ticket Created</span>
+                  {ticket.anydesk_id && (
+                    <div className="flex items-center justify-between text-sm py-2 px-3 bg-indigo-600 text-white rounded-xl shadow-md shadow-indigo-100 animate-in slide-in-from-right-2 duration-300">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        <span className="text-[10px] font-black uppercase tracking-widest">AnyDesk ID</span>
+                      </div>
+                      <span className="font-black text-base">{ticket.anydesk_id}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between text-sm px-1">
+                    <span className="text-slate-400 font-medium italics uppercase text-[10px] tracking-widest">Ticket Created</span>
                     <span className="text-slate-700 font-bold">{formatDate(ticket.created_at)}</span>
                   </div>
                 </div>

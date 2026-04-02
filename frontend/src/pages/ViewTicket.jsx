@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import axios from 'axios'
+import { QRCodeSVG } from 'qrcode.react'
 import notificationSound from '../sound/notification_message-notification-alert-8-331718.m4a'
 import { saveRecentTicket } from '../utils/ticketStorage'
 import { getBrowserMetadata } from '../utils/browserInfo'
@@ -27,6 +28,8 @@ const ViewTicket = () => {
   const [submittingFeedback, setSubmittingFeedback] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
   const [typingUser, setTypingUser] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [showQR, setShowQR] = useState(false)
   const typingTimeoutRef = useRef(null)
 
   useEffect(() => {
@@ -74,6 +77,12 @@ const ViewTicket = () => {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const fetchTicket = async () => {
     try {
@@ -302,11 +311,50 @@ const ViewTicket = () => {
             <h1 className="text-2xl font-bold">{ticket.issue_title}</h1>
             <p className="text-gray-500">{ticket.ticket_id}</p>
           </div>
-          <div className="flex gap-2">
-            {getStatusBadge(ticket.status)}
-            {getPriorityBadge(ticket.priority)}
+          <div className="flex flex-col items-end gap-3">
+            <div className="flex gap-2">
+              {getStatusBadge(ticket.status)}
+              {getPriorityBadge(ticket.priority)}
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleCopyLink}
+                className={`p-2 rounded-xl transition-all border ${
+                  copied 
+                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-md' 
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-primary-500 hover:text-primary-600 shadow-sm'
+                }`}
+                title="Copy Link"
+              >
+                {copied ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                )}
+              </button>
+              <button 
+                onClick={() => setShowQR(true)}
+                className="p-2 bg-white text-slate-500 border border-slate-200 rounded-xl hover:border-primary-500 hover:text-primary-600 transition-all shadow-sm"
+                title="View QR Code"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" /></svg>
+              </button>
+            </div>
           </div>
         </div>
+
+        {showQR && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={() => setShowQR(false)}>
+            <div className="bg-white p-8 rounded-3xl shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col items-center gap-4" onClick={e => e.stopPropagation()}>
+              <h3 className="text-xl font-bold text-slate-900">Scan to follow status</h3>
+              <div className="p-4 bg-white border-8 border-slate-50 rounded-2xl">
+                <QRCodeSVG value={window.location.href} size={200} />
+              </div>
+              <p className="text-slate-500 text-sm font-medium">{ticket.ticket_id}</p>
+              <button onClick={() => setShowQR(false)} className="mt-2 btn-secondary w-full py-3">Close</button>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 p-6 bg-slate-50/50 rounded-2xl border border-slate-100 mb-8 mt-2">
           <div className="flex flex-col gap-1.5">
@@ -340,6 +388,16 @@ const ViewTicket = () => {
             </div>
             <p className="text-sm font-bold text-indigo-600 truncate">{ticket.assigned_name || 'Waiting for IT'}</p>
           </div>
+
+          {ticket.anydesk_id && (
+            <div className="flex flex-col gap-1.5 bg-indigo-50/50 p-2 rounded-xl border border-indigo-100/50">
+              <div className="flex items-center gap-2 text-indigo-400">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                <span className="text-[9px] font-black uppercase tracking-widest leading-none">AnyDesk ID</span>
+              </div>
+              <p className="text-sm font-black text-indigo-600">{ticket.anydesk_id}</p>
+            </div>
+          )}
         </div>
 
         {/* Special Request Details for Voice/CCTV */}

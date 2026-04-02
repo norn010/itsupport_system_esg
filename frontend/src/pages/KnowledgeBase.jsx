@@ -19,6 +19,21 @@ const KnowledgeBase = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const formatDate = (dateInput) => {
+    if (!dateInput) return '-';
+    // Handle Firestore Timestamp { _seconds, _nanoseconds }
+    if (dateInput && typeof dateInput === 'object' && dateInput._seconds) {
+      return new Date(dateInput._seconds * 1000).toLocaleDateString('th-TH', {
+        year: 'numeric', month: 'long', day: 'numeric'
+      });
+    }
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('th-TH', {
+      year: 'numeric', month: 'long', day: 'numeric'
+    });
+  };
+
   useEffect(() => {
     fetchCategories();
   }, []);
@@ -97,8 +112,7 @@ const KnowledgeBase = () => {
                   </span>
                 )}
                 <span>By {activeArticle.author_name}</span>
-                <span>•</span>
-                <span>{new Date(activeArticle.updated_at || activeArticle.created_at).toLocaleDateString()}</span>
+                <span>{formatDate(activeArticle.updated_at || activeArticle.created_at)}</span>
               </div>
             </div>
             <button 
@@ -211,7 +225,7 @@ const KnowledgeBase = () => {
                             {article.category_name}
                           </span>
                         )}
-                        <span>{new Date(article.updated_at || article.created_at).toLocaleDateString()}</span>
+                        <span>{formatDate(article.updated_at || article.created_at)}</span>
                       </div>
                     </div>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-300 group-hover:text-primary-500 transform group-hover:translate-x-1 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">

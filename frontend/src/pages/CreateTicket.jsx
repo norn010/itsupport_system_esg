@@ -14,6 +14,7 @@ const CreateTicket = () => {
     category_id: '',
     subcategory_id: '',
     asset_id: '',
+    anydesk_id: '',
   })
   const [ticketType, setTicketType] = useState('general') // general, voice_recording, cctv
   const [specialData, setSpecialData] = useState({
@@ -141,6 +142,7 @@ const CreateTicket = () => {
       data.append('category_id', formData.category_id)
       data.append('subcategory_id', formData.subcategory_id)
       data.append('asset_id', formData.asset_id)
+      data.append('anydesk_id', formData.anydesk_id)
       
       files.forEach(file => {
         data.append('images', file)
@@ -171,6 +173,7 @@ const CreateTicket = () => {
         category_id: '',
         subcategory_id: '',
         asset_id: '',
+        anydesk_id: '',
       })
       setSpecialData({ phone: '', start_time: '', end_time: '' })
       setTicketType('general')
@@ -510,6 +513,27 @@ const CreateTicket = () => {
                   }`}>{selectedAsset.status}</span>
               </div>
             )}
+            {/* AnyDesk ID Input */}
+            <div className="mt-6">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                🆔 AnyDesk ID <span className="text-gray-400 font-normal ml-1">(ถ้ามี)</span>
+              </label>
+              <div className="relative group">
+                <input
+                  type="text"
+                  name="anydesk_id"
+                  value={formData.anydesk_id}
+                  onChange={handleChange}
+                  className="input pl-10 bg-slate-50 border-slate-200 focus:bg-white transition-all group-hover:border-primary-300"
+                  placeholder="เช่น 123 456 789"
+                  maxLength="15"
+                />
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-primary-500 transition-colors">
+                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1.5 ml-1 font-medium italic">* เพื่อความรวดเร็วในการรีโมทช่วยเหลือจากเจ้าหน้าที่</p>
+            </div>
           </div>
 
           <div>
