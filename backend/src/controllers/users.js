@@ -43,6 +43,11 @@ export const deleteUser = async (req, res) => {
     if (id === req.user.username) {
       return res.status(400).json({ message: 'Cannot delete yourself' });
     }
+    // Check if target user is MANAGER/ADMIN — cannot be deleted
+    const targetUser = await User.findById(id);
+    if (targetUser && (targetUser.role === 'MANAGER' || targetUser.role === 'ADMIN')) {
+      return res.status(403).json({ message: 'Cannot delete an admin/manager account' });
+    }
     await User.delete(id);
     res.json({ message: 'User deleted' });
   } catch (error) {

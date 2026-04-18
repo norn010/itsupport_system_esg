@@ -2,6 +2,18 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
+
+// ─── Helper: parse Firestore Timestamp OR ISO string → JS Date ───
+const parseDate = (val) => {
+  if (!val) return null
+  if (typeof val === 'object') {
+    if (val._seconds !== undefined) return new Date(val._seconds * 1000)
+    if (val.seconds !== undefined) return new Date(val.seconds * 1000)
+    if (typeof val.toDate === 'function') return val.toDate()
+  }
+  const d = new Date(val)
+  return isNaN(d.getTime()) ? null : d
+}
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -48,11 +60,8 @@ const Dashboard = () => {
 
 
   const formatDateSafe = (dateInput) => {
-    if (!dateInput) return '-';
-    if (typeof dateInput === 'object' && dateInput._seconds) {
-      return new Date(dateInput._seconds * 1000).toLocaleDateString();
-    }
-    return new Date(dateInput).toLocaleDateString();
+    const d = parseDate(dateInput);
+    return d ? d.toLocaleDateString('th-TH') : '-';
   };
 
   const dailyChartData = {

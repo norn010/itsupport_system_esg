@@ -19,6 +19,10 @@ import InventoryList from './pages/InventoryList'
 import Home from './pages/Home'
 import QueueTicket from './pages/QueueTicket'
 import ManageUsers from './pages/ManageUsers'
+import ITsRackPhoto from './pages/ITsRackPhoto'
+import ITsTicket from './pages/ITsTicket'
+import ITsTicketDashboard from './pages/ITsTicketDashboard'
+import ITsRackDashboard from './pages/ITsRackDashboard'
 
 function App() {
   const { user } = useAuth()
@@ -60,6 +64,29 @@ function App() {
         <Route path="/admin/users" element={
           <Layout requireAuth>
             <ManageUsers />
+          </Layout>
+        } />
+
+        {/* IT's Role Routes */}
+        <Route path="/its/ticket" element={
+          <Layout requireAuth>
+            <ITsTicket />
+          </Layout>
+        } />
+        <Route path="/its/rack-photo" element={
+          <Layout requireAuth>
+            <ITsRackPhoto />
+          </Layout>
+        } />
+        {/* IT's Dashboards (MANAGER/IT only) */}
+        <Route path="/its/ticket-dashboard" element={
+          <Layout requireAuth>
+            <ITsTicketDashboard />
+          </Layout>
+        } />
+        <Route path="/its/rack-dashboard" element={
+          <Layout requireAuth>
+            <ITsRackDashboard />
           </Layout>
         } />
 

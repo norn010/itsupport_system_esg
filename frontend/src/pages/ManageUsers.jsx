@@ -56,8 +56,15 @@ const ManageUsers = () => {
       await axios.delete(`/api/users/${userId}`);
       fetchUsers();
     } catch (err) {
-      alert('Failed to delete user');
+      alert(err.response?.data?.message || 'Failed to delete user');
     }
+  };
+
+  // Determine if a user can be deleted: not self, not MANAGER, not ADMIN
+  const canDelete = (u) => {
+    if (u.id === currentUser.id) return false;
+    if (u.role === 'MANAGER' || u.role === 'ADMIN') return false;
+    return true;
   };
 
   if (loading) return <div className="p-8 text-center text-slate-500">Loading users...</div>;
@@ -91,7 +98,10 @@ const ManageUsers = () => {
               </div>
               <div className="ml-auto">
                 <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${
-                  u.role === 'ADMIN' || u.role === 'IT' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'
+                  u.role === 'MANAGER' ? 'bg-yellow-100 text-yellow-700' :
+                  u.role === 'IT' ? 'bg-indigo-100 text-indigo-700' :
+                  u.role === "IT's" ? 'bg-purple-100 text-purple-700' :
+                  'bg-slate-100 text-slate-600'
                 }`}>
                   {u.role}
                 </span>
@@ -106,7 +116,10 @@ const ManageUsers = () => {
             </div>
 
             <div className="pt-4 border-t border-slate-50 flex justify-end">
-              {u.id !== currentUser.id && (
+              {u.id === currentUser.id && (
+                <span className="text-slate-300 text-[10px] font-black uppercase tracking-widest">You (Active)</span>
+              )}
+              {canDelete(u) && (
                 <button 
                   onClick={() => handleDelete(u.id)}
                   className="text-red-400 hover:text-red-600 text-xs font-bold uppercase tracking-widest transition-colors flex items-center gap-1"
@@ -115,8 +128,11 @@ const ManageUsers = () => {
                   Remove Staff
                 </button>
               )}
-              {u.id === currentUser.id && (
-                <span className="text-slate-300 text-[10px] font-black uppercase tracking-widest">You (Active)</span>
+              {!canDelete(u) && u.id !== currentUser.id && (
+                <span className="text-slate-200 text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                  Protected
+                </span>
               )}
             </div>
           </div>
@@ -163,6 +179,20 @@ const ManageUsers = () => {
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Email Address</label>
                 <input type="email" name="email" value={formData.email} onChange={handleChange} className="input" placeholder="somchai@example.com" />
+              </div>
+
+              {/* Role Dropdown */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Role</label>
+                <select
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  className="input appearance-none cursor-pointer"
+                >
+                  <option value="IT">IT — ทีม IT ทั่วไป</option>
+                  <option value="IT's">IT's — ผู้ใช้งานระดับสาขา</option>
+                </select>
               </div>
 
               <div className="pt-4">

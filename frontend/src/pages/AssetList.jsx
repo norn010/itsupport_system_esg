@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
@@ -29,12 +29,13 @@ const AssetList = () => {
   const [subcategories, setSubcategories] = useState([])
   const [vendors, setVendors] = useState([])
   const [saving, setSaving] = useState(false)
+  const [isAddingLoc, setIsAddingLoc] = useState(false)
   
   // Filter Combobox states
   const [fStatusOpen, setFStatusOpen] = useState(false)
-  const [fCatOpen, setFCatOpen] = useState(false)
+  const [fCatOpen, setCatFOpen] = useState(false)
   const [fCatSearch, setFCatSearch] = useState('')
-  const [fLocOpen, setFLocOpen] = useState(false)
+  const [fLocOpen, setLocFOpen] = useState(false)
   const [fLocSearch, setFLocSearch] = useState('')
 
   // Modal Combobox states
@@ -46,6 +47,14 @@ const AssetList = () => {
   const [venSearch, setVenSearch] = useState('')
   const [locOpen, setLocOpen] = useState(false)
   const [locSearch, setLocSearch] = useState('')
+  
+  const locDropRef = useRef(null)
+  const catDropRef = useRef(null)
+  const subDropRef = useRef(null)
+  const venDropRef = useRef(null)
+  const catFRef = useRef(null)
+  const locFRef = useRef(null)
+  const statusFRef = useRef(null)
 
   const fetchAssets = useCallback(async () => {
     setLoading(true)
@@ -67,17 +76,33 @@ const AssetList = () => {
   useEffect(() => {
     const loadLookups = async () => {
       try {
-        const [catRes, locRes, venRes] = await Promise.all([
-          axios.get('/api/assets/categories'),
-          axios.get('/api/assets/locations'),
-          axios.get('/api/assets/vendors')
-        ])
-        setCategories(catRes.data)
-        setLocations(locRes.data)
-        setVendors(venRes.data)
-      } catch (err) { console.error(err) }
+        const { data } = await axios.get('/api/assets/categories')
+        if (Array.isArray(data)) setCategories(data)
+      } catch (err) { console.error('Error fetching categories:', err) }
+
+      try {
+        const { data } = await axios.get('/api/locations')
+        if (Array.isArray(data)) setLocations(data)
+      } catch (err) { console.error('Error fetching locations:', err) }
+
+      try {
+        const { data } = await axios.get('/api/assets/vendors')
+        if (Array.isArray(data)) setVendors(data)
+      } catch (err) { console.error('Error fetching vendors:', err) }
     }
     loadLookups()
+
+    const handleClickOutside = (e) => {
+      if (locDropRef.current && !locDropRef.current.contains(e.target)) setLocOpen(false)
+      if (catDropRef.current && !catDropRef.current.contains(e.target)) setCatOpen(false)
+      if (subDropRef.current && !subDropRef.current.contains(e.target)) setSubOpen(false)
+      if (venDropRef.current && !venDropRef.current.contains(e.target)) setVenOpen(false)
+      if (catFRef.current && !catFRef.current.contains(e.target)) setCatFOpen(false)
+      if (locFRef.current && !locFRef.current.contains(e.target)) setLocFOpen(false)
+      if (statusFRef.current && !statusFRef.current.contains(e.target)) setFStatusOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
   useEffect(() => {
@@ -96,17 +121,19 @@ const AssetList = () => {
     try {
       const data = new FormData()
       Object.keys(formData).forEach(key => {
+        if (key === 'image') return; // Handled separately
         if (formData[key] !== null && formData[key] !== '') {
           data.append(key, formData[key])
         }
       })
-      // Auto-create names if IDs missing
       if (!formData.category_id && catSearch) data.append('category_name', catSearch);
       if (!formData.subcategory_id && subSearch) data.append('subcategory_name', subSearch);
       if (!formData.vendor_id && venSearch) data.append('vendor_name', venSearch);
       if (!formData.location_id && locSearch) data.append('location_name', locSearch);
       
-      if (formData.image) data.append('image', formData.image);
+      if (formData.image) {
+        data.append('image', formData.image);
+      }
 
       await axios.post('/api/assets', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -114,7 +141,6 @@ const AssetList = () => {
       setShowCreateModal(false)
       setFormData({ name: '', category_id: '', subcategory_id: '', brand: '', model: '', serial_number: '', purchase_date: '', warranty_expiry: '', cost: '', vendor_id: '', location_id: '', description: '', image: null })
       setCatSearch(''); setSubSearch(''); setVenSearch(''); setLocSearch('');
-      // Clear filters so the new asset shows up
       setFilters({ search: '', status: '', category_id: '', location_id: '' })
       setFCatSearch(''); setFLocSearch('');
       fetchAssets()
@@ -125,16 +151,37 @@ const AssetList = () => {
     }
   }
 
+  const handleAddNewLocation = async () => {
+    const name = locSearch.trim()
+    if (!name) return
+    setIsAddingLoc(true)
+    try {
+      const { data } = await axios.post('/api/locations', { name })
+      setLocations(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name, 'th')))
+      handleSelectLocation(data)
+    } catch (err) {
+      alert(err.response?.data?.message || 'ไม่สามารถเพิ่มสาขาได้')
+    } finally {
+      setIsAddingLoc(false)
+    }
+  }
+
+  const handleSelectLocation = (loc) => {
+    setFormData(p => ({...p, location_id: loc.id}));
+    setLocSearch(loc.name);
+    setLocOpen(false);
+  }
+
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }))
     setPage(1)
   }
 
   const totalPages = Math.ceil(total / 25)
+  const filteredLocations = locations.filter(l => l.name.toLowerCase().includes(locSearch.toLowerCase()))
 
   return (
     <div>
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-indigo-600 bg-clip-text text-transparent">
@@ -154,7 +201,6 @@ const AssetList = () => {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="card mb-6 !p-4">
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <input
@@ -165,8 +211,7 @@ const AssetList = () => {
             onChange={e => handleFilterChange('search', e.target.value)}
           />
           
-          {/* Status Filter Combobox */}
-          <div className="relative">
+          <div className="relative" ref={statusFRef}>
             <div className="input-group">
               <input 
                 className="input !py-2 text-sm pr-10 cursor-pointer" 
@@ -175,70 +220,65 @@ const AssetList = () => {
                 value={filters.status || 'All Status'}
                 onClick={() => setFStatusOpen(!fStatusOpen)}
               />
-              <svg className={`dropdown-icon transition-transform ${fStatusOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              <button type="button" onClick={() => setFStatusOpen(!fStatusOpen)} className="absolute right-3 text-slate-400">
+                <svg className={`w-4 h-4 transition-transform ${fStatusOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              </button>
             </div>
             {fStatusOpen && (
-              <>
-                <div className="fixed inset-0 z-[60]" onClick={() => setFStatusOpen(false)}></div>
-                <div className="absolute z-[70] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
-                  <button onClick={() => { handleFilterChange('status', ''); setFStatusOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50">All Status</button>
-                  {['Available','In Use','Repair','Lost','Retired'].map(s => (
-                    <button key={s} onClick={() => { handleFilterChange('status', s); setFStatusOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0">{s}</button>
-                  ))}
-                </div>
-              </>
+              <div className="absolute z-[70] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
+                <button onClick={() => { handleFilterChange('status', ''); setFStatusOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50">All Status</button>
+                {['Available','In Use','Repair','Lost','Retired'].map(s => (
+                  <button key={s} onClick={() => { handleFilterChange('status', s); setFStatusOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0">{s}</button>
+                ))}
+              </div>
             )}
           </div>
 
-          {/* Category Filter Combobox */}
-          <div className="relative">
+          <div className="relative" ref={catFRef}>
             <div className="input-group">
               <input 
                 className="input !py-2 text-sm pr-10" 
                 placeholder="All Categories"
                 value={fCatSearch || (categories.find(c => c.id == filters.category_id)?.name || '')}
-                onChange={e => { setFCatSearch(e.target.value); setFCatOpen(true) }}
-                onFocus={() => { setFCatOpen(true); setFCatSearch('') }}
+                onChange={e => { setFCatSearch(e.target.value); setCatFOpen(true) }}
+                onFocus={() => { setCatFOpen(true) }}
                 autoComplete="off"
               />
-              <svg className={`dropdown-icon transition-transform ${fCatOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              <button type="button" onClick={() => setCatFOpen(!fCatOpen)} className="absolute right-3 text-slate-400">
+                <svg className={`w-4 h-4 transition-transform ${fCatOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              </button>
             </div>
             {fCatOpen && (
-              <>
-                <div className="fixed inset-0 z-[60]" onClick={() => setFCatOpen(false)}></div>
-                <div className="absolute z-[70] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
-                  <button onClick={() => { handleFilterChange('category_id', ''); setFCatSearch(''); setFCatOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50">All Categories</button>
-                  {categories.filter(c => c.name.toLowerCase().includes(fCatSearch.toLowerCase())).map(c => (
-                    <button key={c.id} onClick={() => { handleFilterChange('category_id', c.id); setFCatSearch(c.name); setFCatOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0">{c.name}</button>
-                  ))}
-                </div>
-              </>
+              <div className="absolute z-[70] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
+                <button onClick={() => { handleFilterChange('category_id', ''); setFCatSearch(''); setCatFOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50">All Categories</button>
+                {categories.filter(c => c.name.toLowerCase().includes(fCatSearch.toLowerCase())).map(c => (
+                  <button key={c.id} onClick={() => { handleFilterChange('category_id', c.id); setFCatSearch(c.name); setCatFOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0">{c.name}</button>
+                ))}
+              </div>
             )}
           </div>
 
-          {/* Location Filter Combobox */}
-          <div className="relative">
+          <div className="relative" ref={locFRef}>
             <div className="input-group">
               <input 
                 className="input !py-2 text-sm pr-10" 
                 placeholder="All Locations"
                 value={fLocSearch || (locations.find(l => l.id == filters.location_id)?.name || '')}
-                onChange={e => { setFLocSearch(e.target.value); setFLocOpen(true) }}
-                onFocus={() => { setFLocOpen(true); setFLocSearch('') }}
+                onChange={e => { setFLocSearch(e.target.value); setLocFOpen(true) }}
+                onFocus={() => { setLocFOpen(true) }}
                 autoComplete="off"
               />
-              <svg className={`dropdown-icon transition-transform ${fLocOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              <button type="button" onClick={() => setLocFOpen(!fLocOpen)} className="absolute right-3 text-slate-400">
+                <svg className={`w-4 h-4 transition-transform ${fLocOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              </button>
             </div>
             {fLocOpen && (
-              <>
-                <div className="fixed inset-0 z-[60]" onClick={() => setFLocOpen(false)}></div>
-                <div className="absolute z-[70] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
-                  <button onClick={() => { handleFilterChange('location_id', ''); setFLocSearch(''); setFLocOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50">All Locations</button>
-                  {locations.filter(l => l.name.toLowerCase().includes(fLocSearch.toLowerCase())).map(l => (
-                    <button key={l.id} onClick={() => { handleFilterChange('location_id', l.id); setFLocSearch(l.name); setFLocOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0">{l.name}</button>
-                  ))}
-                </div>
-              </>
+              <div className="absolute z-[70] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
+                <button onClick={() => { handleFilterChange('location_id', ''); setFLocSearch(''); setLocFOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50">All Locations</button>
+                {locations.filter(l => l.name.toLowerCase().includes(fLocSearch.toLowerCase())).map(l => (
+                  <button key={l.id} onClick={() => { handleFilterChange('location_id', l.id); setFLocSearch(l.name); setLocFOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0">{l.name}</button>
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -330,10 +370,9 @@ const AssetList = () => {
                   <label className="block text-sm font-medium text-slate-700 mb-1">Asset Name *</label>
                   <input className="input" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} required />
                 </div>
-                {/* Category Combobox */}
-                <div className="relative">
+                <div className="relative" ref={catDropRef}>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
-                  <div className="input-group">
+                  <div className="relative flex items-center">
                     <input 
                       className="input pr-10" 
                       placeholder="Search category..."
@@ -342,7 +381,6 @@ const AssetList = () => {
                         const val = e.target.value;
                         setCatSearch(val); 
                         setCatOpen(true);
-                        // Auto-select if exact match or clear if empty
                         const match = categories.find(c => c.name.toLowerCase() === val.toLowerCase());
                         if (match) setFormData(p => ({...p, category_id: match.id, subcategory_id: ''}));
                         else if (!val) setFormData(p => ({...p, category_id: '', subcategory_id: ''}));
@@ -350,35 +388,34 @@ const AssetList = () => {
                       onFocus={() => { setCatOpen(true) }}
                       autoComplete="off"
                     />
-                    <svg className={`dropdown-icon transition-transform ${catOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                    <button type="button" onClick={() => setCatOpen(!catOpen)} className="absolute right-3 text-slate-400">
+                      <svg className={`w-5 h-5 transition-transform ${catOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
                   </div>
                   {catOpen && (
-                    <>
-                      <div className="fixed inset-0 z-[60]" onClick={() => setCatOpen(false)}></div>
-                      <div className="absolute z-[70] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
-                        {categories.filter(c => c.name.toLowerCase().includes(catSearch.toLowerCase())).map(c => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => {
-                              setFormData(p => ({...p, category_id: c.id, subcategory_id: ''}));
-                              setCatSearch(c.name);
-                              setCatOpen(false);
-                            }}
-                            className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0"
-                          >
-                            {c.name}
-                          </button>
-                        ))}
-                      </div>
-                    </>
+                    <div className="absolute z-[110] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
+                      {categories.filter(c => c.name.toLowerCase().includes(catSearch.toLowerCase())).map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setFormData(p => ({...p, category_id: c.id, subcategory_id: ''}));
+                            setCatSearch(c.name);
+                            setCatOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0"
+                        >
+                          {c.name}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
 
                 {/* Subcategory Combobox */}
-                <div className="relative">
+                <div className="relative" ref={subDropRef}>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Subcategory</label>
-                  <div className="input-group">
+                  <div className="relative flex items-center">
                     <input 
                       className="input pr-10 disabled:opacity-50" 
                       placeholder="Search subcategory..."
@@ -395,28 +432,27 @@ const AssetList = () => {
                       onFocus={() => { setSubOpen(true) }}
                       autoComplete="off"
                     />
-                    <svg className={`dropdown-icon transition-transform ${subOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                    <button type="button" onClick={() => setSubOpen(!subOpen)} disabled={!formData.category_id} className="absolute right-3 text-slate-400">
+                      <svg className={`w-5 h-5 transition-transform ${subOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
                   </div>
                   {subOpen && (
-                    <>
-                      <div className="fixed inset-0 z-[60]" onClick={() => setSubOpen(false)}></div>
-                      <div className="absolute z-[70] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
-                        {subcategories.filter(s => s.name.toLowerCase().includes(subSearch.toLowerCase())).map(s => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => {
-                              setFormData(p => ({...p, subcategory_id: s.id}));
-                              setSubSearch(s.name);
-                              setSubOpen(false);
-                            }}
-                            className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0"
-                          >
-                            {s.name}
-                          </button>
-                        ))}
-                      </div>
-                    </>
+                    <div className="absolute z-[110] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
+                      {subcategories.filter(s => s.name.toLowerCase().includes(subSearch.toLowerCase())).map(s => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            setFormData(p => ({...p, subcategory_id: s.id}));
+                            setSubSearch(s.name);
+                            setSubOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0"
+                        >
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
                 <div>
@@ -432,9 +468,9 @@ const AssetList = () => {
                   <input className="input" value={formData.serial_number} onChange={e => setFormData(p => ({...p, serial_number: e.target.value}))} />
                 </div>
                 {/* Vendor Combobox */}
-                <div className="relative">
+                <div className="relative" ref={venDropRef}>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Vendor</label>
-                  <div className="input-group">
+                  <div className="relative flex items-center">
                     <input 
                       className="input pr-10" 
                       placeholder="Search vendor..."
@@ -450,28 +486,27 @@ const AssetList = () => {
                       onFocus={() => { setVenOpen(true) }}
                       autoComplete="off"
                     />
-                    <svg className={`dropdown-icon transition-transform ${venOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                    <button type="button" onClick={() => setVenOpen(!venOpen)} className="absolute right-3 text-slate-400">
+                      <svg className={`w-5 h-5 transition-transform ${venOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
                   </div>
                   {venOpen && (
-                    <>
-                      <div className="fixed inset-0 z-[60]" onClick={() => setVenOpen(false)}></div>
-                      <div className="absolute z-[70] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
-                        {vendors.filter(v => v.name.toLowerCase().includes(venSearch.toLowerCase())).map(v => (
-                          <button
-                            key={v.id}
-                            type="button"
-                            onClick={() => {
-                              setFormData(p => ({...p, vendor_id: v.id}));
-                              setVenSearch(v.name);
-                              setVenOpen(false);
-                            }}
-                            className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0"
-                          >
-                            {v.name}
-                          </button>
-                        ))}
-                      </div>
-                    </>
+                    <div className="absolute z-[110] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
+                      {vendors.filter(v => v.name.toLowerCase().includes(venSearch.toLowerCase())).map(v => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => {
+                            setFormData(p => ({...p, vendor_id: v.id}));
+                            setVenSearch(v.name);
+                            setVenOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0"
+                        >
+                          {v.name}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
                 <div>
@@ -486,49 +521,70 @@ const AssetList = () => {
                   <label className="block text-sm font-medium text-slate-700 mb-1">Cost</label>
                   <input type="number" step="0.01" className="input" value={formData.cost} onChange={e => setFormData(p => ({...p, cost: e.target.value}))} />
                 </div>
-                {/* Location Combobox */}
-                <div className="relative">
+                <div className="relative" ref={locDropRef}>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Location</label>
-                  <div className="input-group">
+                  <div className="relative flex items-center">
                     <input 
                       className="input pr-10" 
-                      placeholder="Search location..."
+                      placeholder="Search or add location..."
                       value={locSearch || (locations.find(l => l.id == formData.location_id)?.name || '')}
                       onChange={e => { 
                         const val = e.target.value;
                         setLocSearch(val); 
                         setLocOpen(true);
-                        const match = locations.find(l => l.name.toLowerCase() === val.toLowerCase());
-                        if (match) setFormData(p => ({...p, location_id: match.id}));
-                        else if (!val) setFormData(p => ({...p, location_id: ''}));
+                        setFormData(p => ({...p, location_id: ''}));
                       }}
                       onFocus={() => { setLocOpen(true) }}
                       autoComplete="off"
                     />
-                    <svg className={`dropdown-icon transition-transform ${locOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                    <button
+                      type="button"
+                      onClick={() => setLocOpen(!locOpen)}
+                      className="absolute right-3 text-slate-400 hover:text-primary-600 transition"
+                    >
+                      <svg className={`w-5 h-5 transition-transform ${locOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
                   </div>
                   {locOpen && (
-                    <>
-                      <div className="fixed inset-0 z-[60]" onClick={() => setLocOpen(false)}></div>
-                      <div className="absolute z-[70] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
-                        {locations.filter(l => l.name.toLowerCase().includes(locSearch.toLowerCase())).map(l => (
+                    <div className="absolute z-[100] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-48 overflow-y-auto animate-in slide-in-from-top-1">
+                      {filteredLocations.length > 0 ? (
+                        filteredLocations.map(l => (
                           <button
                             key={l.id}
                             type="button"
-                            onClick={() => {
-                              setFormData(p => ({...p, location_id: l.id}));
-                              setLocSearch(l.name);
-                              setLocOpen(false);
-                            }}
-                            className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0"
+                            onClick={() => handleSelectLocation(l)}
+                            className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0 flex items-center gap-2"
                           >
+                            <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
                             {l.name}
                           </button>
-                        ))}
-                      </div>
-                    </>
+                        ))
+                      ) : (
+                        <div className="p-3 text-slate-400 text-sm text-center">ไม่พบสาขาที่ค้นหา</div>
+                      )}
+                      {locSearch.trim() && !locations.some(l => l.name.toLowerCase() === locSearch.trim().toLowerCase()) && (
+                        <button
+                          type="button"
+                          onClick={handleAddNewLocation}
+                          disabled={isAddingLoc}
+                          className="w-full text-left px-4 py-2.5 text-primary-600 font-bold hover:bg-primary-50 transition border-t border-slate-100 flex items-center gap-2 text-sm"
+                        >
+                          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          {isAddingLoc ? 'กำลังเพิ่ม...' : `เพิ่มสาขาใหม่ "${locSearch.trim()}"`}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
+                {/* Spacer to prevent modal clipping dropdown */}
+                {locOpen && <div className="h-32 col-span-2"></div>}
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-1">Asset Image</label>
                   <input type="file" accept="image/*" className="input" onChange={e => setFormData(p => ({...p, image: e.target.files[0]}))} />

@@ -20,6 +20,8 @@ import assetRoutes from './routes/assets.js';
 import licenseRoutes from './routes/licenses.js';
 import inventoryRoutes from './routes/inventory.js';
 import userRoutes from './routes/users.js';
+import locationRoutes from './routes/locations.js';
+import rackPhotoRoutes from './routes/rackPhotos.js';
 import { ChatMessage } from './models/index.js';
 
 dotenv.config();
@@ -66,6 +68,8 @@ app.use('/api/assets', assetRoutes);
 app.use('/api/licenses', licenseRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/locations', locationRoutes);
+app.use('/api/rack-photos', rackPhotoRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

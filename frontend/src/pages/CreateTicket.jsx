@@ -16,12 +16,7 @@ const CreateTicket = () => {
     asset_id: '',
     anydesk_id: '',
   })
-  const [ticketType, setTicketType] = useState('general') // general, voice_recording, cctv
-  const [specialData, setSpecialData] = useState({
-    phone: '',
-    start_time: '',
-    end_time: '',
-  })
+  const [ticketType] = useState('general')
   const [computerName, setComputerName] = useState('')
   // Asset search state
   const [assetSearch, setAssetSearch] = useState('')
@@ -35,28 +30,67 @@ const CreateTicket = () => {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(null)
   const [error, setError] = useState(null)
-  const [existingDepartments, setExistingDepartments] = useState([])
-  const [deptDropdownOpen, setDeptDropdownOpen] = useState(false)
+  const [locations, setLocations] = useState([])
+  const [locSearch, setLocSearch] = useState('')
+  const [isLocDropOpen, setIsLocDropOpen] = useState(false)
+  const [selectedLocation, setSelectedLocation] = useState(null)
+  const [isAddingLoc, setIsAddingLoc] = useState(false)
+  const locDropRef = useRef(null)
 
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
   }
   useEffect(() => {
-    axios.get('/api/tickets/departments')
-      .then(res => setExistingDepartments(res.data.map(d => d.department)))
-      .catch(err => console.error(err))
-
+    fetchLocations()
     // Load saved computer name
     const savedComp = localStorage.getItem('last_computer_name');
     if (savedComp) setComputerName(savedComp);
   }, [])
 
-  // Close asset dropdown on outside click
+  const fetchLocations = async () => {
+    try {
+      const { data } = await axios.get('/api/locations')
+      setLocations(data)
+    } catch (err) {
+      console.error('Error fetching locations:', err)
+    }
+  }
+
+  const filteredLocations = locations.filter(l =>
+    l.name?.toLowerCase().includes(locSearch.toLowerCase())
+  )
+
+  const handleSelectLocation = (loc) => {
+    setSelectedLocation(loc)
+    setLocSearch(loc.name)
+    setFormData(prev => ({ ...prev, department: loc.name }))
+    setIsLocDropOpen(false)
+  }
+
+  const handleAddNewLocation = async () => {
+    const name = locSearch.trim()
+    if (!name) return
+    setIsAddingLoc(true)
+    try {
+      const { data } = await axios.post('/api/locations', { name })
+      setLocations(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name, 'th')))
+      handleSelectLocation(data)
+    } catch (err) {
+      alert(err.response?.data?.message || 'ไม่สามารถเพิ่มสาขาได้')
+    } finally {
+      setIsAddingLoc(false)
+    }
+  }
+
+  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e) => {
       if (assetSearchRef.current && !assetSearchRef.current.contains(e.target)) {
         setAssetDropdownOpen(false)
+      }
+      if (locDropRef.current && !locDropRef.current.contains(e.target)) {
+        setIsLocDropOpen(false)
       }
     }
     document.addEventListener('mousedown', handler)
@@ -111,10 +145,6 @@ const CreateTicket = () => {
     setPreviewUrls(newPreviews)
   }
 
-  const handleSpecialChange = (e) => {
-    const { name, value } = e.target
-    setSpecialData(prev => ({ ...prev, [name]: value }))
-  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -122,16 +152,8 @@ const CreateTicket = () => {
     setError(null)
 
     try {
-      let finalTitle = formData.issue_title
-      let finalDescription = formData.description
-
-      if (ticketType === 'voice_recording') {
-        finalTitle = `ขอไฟล์บันทึกเสียง - ${formData.department || 'ไม่ระบุสาขา'}`
-        finalDescription = `เบอร์โทรศัพท์: ${specialData.phone}\nเวลาเริ่มต้น: ${specialData.start_time}\nเวลาสิ้นสุด: ${specialData.end_time}\nสาขา/จุดที่ติดตั้ง: ${formData.department || 'ไม่ระบุ'}\nรายละเอียด: ${formData.description || '-'}`
-      } else if (ticketType === 'cctv') {
-        finalTitle = `ขอไฟล์กล้องวงจรปิด - ${formData.department || 'ไม่ระบุสาขา'}`
-        finalDescription = `เวลาเริ่มต้น: ${specialData.start_time}\nเวลาสิ้นสุด: ${specialData.end_time}\nจุดที่ต้องการดู: ${formData.description || '-'}\nสาขา: ${formData.department || 'ไม่ระบุ'}`
-      }
+      const finalTitle = formData.issue_title
+      const finalDescription = formData.description
 
       const data = new FormData()
       data.append('name', formData.name)
@@ -175,14 +197,14 @@ const CreateTicket = () => {
         asset_id: '',
         anydesk_id: '',
       })
-      setSpecialData({ phone: '', start_time: '', end_time: '' })
-      setTicketType('general')
       setSubcategories([])
       setFiles([])
       setPreviewUrls([])
       setSelectedAsset(null)
       setAssetSearch('')
       setAssetResults([])
+      setLocSearch('')
+      setSelectedLocation(null)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create ticket')
     } finally {
@@ -228,42 +250,7 @@ const CreateTicket = () => {
           </div>
         )}
 
-        {/* Ticket Type Tabs */}
-        <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-2xl mb-8">
-          <button
-            type="button"
-            onClick={() => setTicketType('general')}
-            className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${
-              ticketType === 'general' 
-                ? 'bg-white dark:bg-primary-600 shadow-md text-primary-600 dark:text-white' 
-                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-            }`}
-          >
-            📋 แจ้งทั่วไป
-          </button>
-          <button
-            type="button"
-            onClick={() => setTicketType('voice_recording')}
-            className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${
-              ticketType === 'voice_recording' 
-                ? 'bg-white dark:bg-primary-600 shadow-md text-primary-600 dark:text-white' 
-                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-            }`}
-          >
-            🎙️ บันทึกเสียง
-          </button>
-          <button
-            type="button"
-            onClick={() => setTicketType('cctv')}
-            className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${
-              ticketType === 'cctv' 
-                ? 'bg-white dark:bg-primary-600 shadow-md text-primary-600 dark:text-white' 
-                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-            }`}
-          >
-            📸 กล้องวงจรปิด
-          </button>
-        </div>
+
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -280,152 +267,91 @@ const CreateTicket = () => {
               />
             </div>
 
-            <div className="relative">
+            <div className="relative" ref={locDropRef}>
               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                {ticketType === 'general' ? 'แผนก' : 'เลือกสาขา'} *
+                สาขา *
               </label>
-              <div className="input-group">
+              <div className="relative flex items-center">
                 <input
                   type="text"
-                  name="department"
-                  value={formData.department}
+                  value={locSearch}
                   onChange={(e) => {
-                    setFormData(prev => ({ ...prev, department: e.target.value }));
-                    setDeptDropdownOpen(true);
+                    setLocSearch(e.target.value)
+                    setSelectedLocation(null)
+                    setFormData(prev => ({ ...prev, department: '' }))
+                    setIsLocDropOpen(true)
                   }}
-                  onFocus={() => setDeptDropdownOpen(true)}
+                  onFocus={() => setIsLocDropOpen(true)}
                   className="input pr-10"
-                  placeholder={ticketType === 'general' ? "e.g., IT, HR, Sales" : "กรุณาเลือกหรือระบุสาขา"}
+                  placeholder="ค้นหาหรือเพิ่มสาขาใหม่..."
                   autoComplete="off"
-                  required
+                  required={!formData.department}
                 />
-                <svg className={`dropdown-icon transition-transform ${deptDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                <button
+                  type="button"
+                  onClick={() => setIsLocDropOpen(!isLocDropOpen)}
+                  className="absolute right-3 text-slate-400 hover:text-primary-600 transition"
+                >
+                  <svg className={`w-5 h-5 transition-transform ${isLocDropOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
               </div>
 
-              {/* Custom Dropdown for Department */}
-              {deptDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-20" onClick={() => setDeptDropdownOpen(false)}></div>
-                  <div className="absolute z-30 w-full mt-1 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-white/10 max-h-48 overflow-y-auto">
-                    {(() => {
-                      const uniqueDepts = Array.from(new Set(existingDepartments));
-                      const filtered = uniqueDepts.filter(d =>
-                        d.toLowerCase().includes(formData.department.toLowerCase())
-                      );
-
-                      if (filtered.length > 0) {
-                        return filtered.map((dept, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              setFormData(prev => ({ ...prev, department: dept }));
-                              setDeptDropdownOpen(false);
-                            }}
-                            className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-slate-700 dark:text-slate-300 text-sm font-medium border-b border-slate-50 dark:border-white/5 last:border-0"
-                          >
-                            {dept}
-                          </button>
-                        ));
-                      }
-                      return null;
-                    })()}
-                  </div>
-                </>
+              {isLocDropOpen && (
+                <div className="absolute z-50 mt-1 w-full bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-white/10 overflow-hidden max-h-52 overflow-y-auto">
+                  {filteredLocations.length > 0 ? (
+                    filteredLocations.map(loc => (
+                      <button
+                        key={loc.id}
+                        type="button"
+                        onClick={() => handleSelectLocation(loc)}
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-slate-700 dark:text-slate-300 text-sm font-medium border-b border-slate-50 dark:border-white/5 flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        {loc.name}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="p-3 text-slate-400 text-sm text-center">ไม่พบสาขาที่ค้นหา</div>
+                  )}
+                  {/* เพิ่มสาขาใหม่ */}
+                  {locSearch.trim() && !filteredLocations.some(l => l.name.toLowerCase() === locSearch.trim().toLowerCase()) && (
+                    <button
+                      type="button"
+                      onClick={handleAddNewLocation}
+                      disabled={isAddingLoc}
+                      className="w-full text-left px-4 py-2.5 text-primary-600 font-bold hover:bg-primary-50 dark:hover:bg-white/5 transition border-t border-slate-100 dark:border-white/5 flex items-center gap-2 text-sm"
+                    >
+                      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      {isAddingLoc ? 'กำลังเพิ่ม...' : `เพิ่มสาขาใหม่ "${locSearch.trim()}"`}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
 
-          {ticketType === 'voice_recording' && (
-            <div className="p-6 bg-primary-50/50 dark:bg-primary-900/10 rounded-2xl border border-primary-100 dark:border-primary-500/20 space-y-4 animate-in slide-in-from-top-2 duration-300">
-              <h3 className="text-sm font-bold text-primary-700 dark:text-primary-400 uppercase tracking-wider">ข้อมูลการร้องขอไฟล์เสียง</h3>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">เบอร์โทรศัพท์ที่ต้องการร้องขอ *</label>
-                <input
-                  type="text"
-                  name="phone"
-                  value={specialData.phone}
-                  onChange={handleSpecialChange}
-                  className="input"
-                  required={ticketType === 'voice_recording'}
-                  placeholder="เช่น 02-xxx-xxxx หรือ เบอร์ภายใน"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">วันเวลาเริ่มต้น *</label>
-                  <input
-                    type="datetime-local"
-                    name="start_time"
-                    value={specialData.start_time}
-                    onChange={handleSpecialChange}
-                    className="input"
-                    required={ticketType === 'voice_recording'}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">วันเวลาสิ้นสุด *</label>
-                  <input
-                    type="datetime-local"
-                    name="end_time"
-                    value={specialData.end_time}
-                    onChange={handleSpecialChange}
-                    className="input"
-                    required={ticketType === 'voice_recording'}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {ticketType === 'cctv' && (
-            <div className="p-6 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-2xl border border-indigo-100 dark:border-indigo-500/20 space-y-4 animate-in slide-in-from-top-2 duration-300">
-              <h3 className="text-sm font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">ข้อมูลการร้องขอไฟล์กล้อง</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">วันเวลาเริ่มต้น *</label>
-                  <input
-                    type="datetime-local"
-                    name="start_time"
-                    value={specialData.start_time}
-                    onChange={handleSpecialChange}
-                    className="input"
-                    required={ticketType === 'cctv'}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">วันเวลาสิ้นสุด *</label>
-                  <input
-                    type="datetime-local"
-                    name="end_time"
-                    value={specialData.end_time}
-                    onChange={handleSpecialChange}
-                    className="input"
-                    required={ticketType === 'cctv'}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {ticketType === 'general' && (
-            <div className="animate-in fade-in duration-500">
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">หัวข้อเรื่อง *</label>
-              <input
-                type="text"
-                name="issue_title"
-                value={formData.issue_title}
-                onChange={handleChange}
-                className="input"
-                required={ticketType === 'general'}
-                placeholder="สรุปปัญหาเบื้องต้น"
-              />
-            </div>
-          )}
-
+          <div className="animate-in fade-in duration-500">
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">หัวข้อเรื่อง *</label>
+            <input
+              type="text"
+              name="issue_title"
+              value={formData.issue_title}
+              onChange={handleChange}
+              className="input"
+              required
+              placeholder="สรุปปัญหาเบื้องต้น"
+            />
+          </div>
           <div>
             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-              {ticketType === 'general' ? 'รายละเอียดเพิ่มเติม' : (ticketType === 'cctv' ? 'รายละเอียด (จุดที่ต้องการดู)' : 'รายละเอียด/หมายเหตุ')}
+              รายละเอียดเพิ่มเติม
             </label>
             <textarea
               name="description"
@@ -433,7 +359,7 @@ const CreateTicket = () => {
               onChange={handleChange}
               className="input min-h-[120px]"
               rows="4"
-              placeholder={ticketType === 'general' ? "อธิบายรายละเอียดของปัญหา..." : "ระบุรายละเอียดเพิ่มเติมเพื่อความรวดเร็วในการตรวจสอบ..."}
+              placeholder="อธิบายรายละเอียดของปัญหา..."
             />
           </div>
 

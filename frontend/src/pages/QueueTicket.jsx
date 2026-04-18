@@ -2,6 +2,18 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { Link } from 'react-router-dom'
 
+// ─── Helper: parse Firestore Timestamp OR ISO string → JS Date ───
+const parseDate = (val) => {
+  if (!val) return null
+  if (typeof val === 'object') {
+    if (val._seconds !== undefined) return new Date(val._seconds * 1000)
+    if (val.seconds !== undefined) return new Date(val.seconds * 1000)
+    if (typeof val.toDate === 'function') return val.toDate()
+  }
+  const d = new Date(val)
+  return isNaN(d.getTime()) ? null : d
+}
+
 const QueueTicket = () => {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -25,16 +37,8 @@ const QueueTicket = () => {
   }
 
   const formatDate = (dateInput) => {
-    if (!dateInput) return '-';
-    // Handle Firestore Timestamp { _seconds, _nanoseconds }
-    if (dateInput && typeof dateInput === 'object' && dateInput._seconds) {
-      return new Date(dateInput._seconds * 1000).toLocaleString('th-TH', {
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit'
-      });
-    }
-    const date = new Date(dateInput);
-    if (isNaN(date.getTime())) return '-';
+    const date = parseDate(dateInput);
+    if (!date) return '-';
     return date.toLocaleString('th-TH', {
       year: '2-digit', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit'
@@ -53,12 +57,12 @@ const QueueTicket = () => {
       const weightA = getPriorityWeight(a.priority)
       const weightB = getPriorityWeight(b.priority)
       if (weightA !== weightB) return weightB - weightA
-      return new Date(a.created_at) - new Date(b.created_at)
+      return parseDate(a.created_at) - parseDate(b.created_at)
     })
 
   const resolvedTickets = tickets
     .filter(t => t.status === 'Resolved')
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .sort((a, b) => parseDate(b.created_at) - parseDate(a.created_at))
 
   const getStatusBadge = (status) => {
     const classes = {

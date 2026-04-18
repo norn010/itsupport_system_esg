@@ -328,8 +328,10 @@ export const AssetMaintenance = {
 // ===========================================================================
 export const AssetCategory = {
   async findAll() {
-    const snap = await db.collection('asset_categories').where('is_active', '==', true).orderBy('name').get();
-    return snap.docs.map(doc => toObj(doc));
+    const snap = await db.collection('asset_categories').where('is_active', '==', true).get();
+    return snap.docs
+      .map(doc => toObj(doc))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'th'));
   },
   async findOrCreateByName(name) {
     const snap = await db.collection('asset_categories').where('name', '==', name.trim()).get();
@@ -349,9 +351,10 @@ export const AssetCategory = {
     const snap = await db.collection('asset_subcategories')
       .where('category_id', '==', categoryId.toString())
       .where('is_active', '==', true)
-      .orderBy('name')
       .get();
-    return snap.docs.map(doc => toObj(doc));
+    return snap.docs
+      .map(doc => toObj(doc))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'th'));
   },
   async findOrCreateSubcategoryByName(categoryId, name) {
     const snap = await db.collection('asset_subcategories')
@@ -376,8 +379,10 @@ export const AssetCategory = {
 // ===========================================================================
 export const Vendor = {
   async findAll() {
-    const snap = await db.collection('vendors').where('is_active', '==', true).orderBy('name').get();
-    return snap.docs.map(doc => toObj(doc));
+    const snap = await db.collection('vendors').where('is_active', '==', true).get();
+    return snap.docs
+      .map(doc => toObj(doc))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'th'));
   },
   async findByName(name) {
     const snap = await db.collection('vendors').where('name', '==', name.trim()).get();

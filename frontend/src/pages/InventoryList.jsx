@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -12,16 +12,18 @@ const InventoryList = () => {
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({ name: '', category: '', quantity: 0, reorder_level: 5, location_id: '' })
   const [editQuantity, setEditQuantity] = useState(0)
+  const [isAddingLoc, setIsAddingLoc] = useState(false)
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('')
-  const [locFilter, setLocFilter] = useState('')
   const [fLocOpen, setFLocOpen] = useState(false)
   const [fLocSearch, setFLocSearch] = useState('')
+  const fLocRef = useRef(null)
 
   // Modal Combobox states
   const [locOpen, setLocOpen] = useState(false)
   const [locSearch, setLocSearch] = useState('')
+  const locDropRef = useRef(null)
 
   const fetchItems = async () => {
     try {
@@ -33,8 +35,42 @@ const InventoryList = () => {
 
   useEffect(() => { fetchItems() }, [])
   useEffect(() => {
-    axios.get('/api/assets/locations').then(res => setLocations(res.data)).catch(() => {})
+    fetchLocations()
+    const handleClickOutside = (e) => {
+      if (locDropRef.current && !locDropRef.current.contains(e.target)) setLocOpen(false)
+      if (fLocRef.current && !fLocRef.current.contains(e.target)) setFLocOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  const fetchLocations = async () => {
+    try {
+      const { data } = await axios.get('/api/locations')
+      setLocations(data)
+    } catch (err) { console.error('Error fetching locations:', err) }
+  }
+
+  const handleAddNewLocation = async () => {
+    const name = locSearch.trim()
+    if (!name) return
+    setIsAddingLoc(true)
+    try {
+      const { data } = await axios.post('/api/locations', { name })
+      setLocations(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name, 'th')))
+      handleSelectLocation(data)
+    } catch (err) {
+      alert(err.response?.data?.message || 'ไม่สามารถเพิ่มสาขาได้')
+    } finally {
+      setIsAddingLoc(false)
+    }
+  }
+
+  const handleSelectLocation = (loc) => {
+    setFormData(prev => ({ ...prev, location_id: loc.id }))
+    setLocSearch(loc.name)
+    setLocOpen(false)
+  }
 
   const handleCreate = async (e) => {
     e.preventDefault()
@@ -70,6 +106,8 @@ const InventoryList = () => {
     } catch (err) { alert(err.response?.data?.message || 'Error') }
   }
 
+  const filteredLocations = locations.filter(l => l.name.toLowerCase().includes(locSearch.toLowerCase()))
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -95,7 +133,7 @@ const InventoryList = () => {
           />
           
           {/* Location Filter Combobox */}
-          <div className="relative">
+          <div className="relative" ref={fLocRef}>
             <div className="input-group">
               <input 
                 className="input !py-2 text-sm pr-10" 
@@ -105,18 +143,17 @@ const InventoryList = () => {
                 onFocus={() => { setFLocOpen(true) }}
                 autoComplete="off"
               />
-              <svg className={`dropdown-icon transition-transform ${fLocOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              <button type="button" onClick={() => setFLocOpen(!fLocOpen)} className="absolute right-3 text-slate-400">
+                <svg className={`w-4 h-4 transition-transform ${fLocOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              </button>
             </div>
             {fLocOpen && (
-              <>
-                <div className="fixed inset-0 z-[60]" onClick={() => setFLocOpen(false)}></div>
-                <div className="absolute z-[70] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
-                  <button onClick={() => { setLocFilter(''); setFLocSearch(''); setFLocOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50">All Locations</button>
-                  {locations.filter(l => l.name.toLowerCase().includes(fLocSearch.toLowerCase())).map(l => (
-                    <button key={l.id} onClick={() => { setLocFilter(l.id); setFLocSearch(l.name); setFLocOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0">{l.name}</button>
-                  ))}
-                </div>
-              </>
+              <div className="absolute z-[70] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
+                <button onClick={() => { setLocFilter(''); setFLocSearch(''); setFLocOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50">All Locations</button>
+                {locations.filter(l => l.name.toLowerCase().includes(fLocSearch.toLowerCase())).map(l => (
+                  <button key={l.id} onClick={() => { setLocFilter(l.id); setFLocSearch(l.name); setFLocOpen(false) }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0">{l.name}</button>
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -232,42 +269,65 @@ const InventoryList = () => {
                   <input type="number" min="0" className="input" value={formData.reorder_level} onChange={e => setFormData(p => ({...p, reorder_level: e.target.value}))} />
                 </div>
               </div>
-              {/* Location Combobox */}
-              <div className="relative">
+              <div className="relative" ref={locDropRef}>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Location</label>
-                <div className="input-group">
+                <div className="relative flex items-center">
                   <input 
                     className="input pr-10" 
-                    placeholder="Search location..."
+                    placeholder="Search or add location..."
                     value={locSearch || (locations.find(l => l.id == formData.location_id)?.name || '')}
-                    onChange={e => { setLocSearch(e.target.value); setLocOpen(true) }}
+                    onChange={e => { setLocSearch(e.target.value); setLocOpen(true); setFormData(p => ({...p, location_id: ''})) }}
                     onFocus={() => { setLocOpen(true) }}
                     autoComplete="off"
                   />
-                  <svg className={`dropdown-icon transition-transform ${locOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                  <button
+                    type="button"
+                    onClick={() => setLocOpen(!locOpen)}
+                    className="absolute right-3 text-slate-400 hover:text-primary-600 transition"
+                  >
+                    <svg className={`w-5 h-5 transition-transform ${locOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
                 </div>
                 {locOpen && (
-                  <>
-                    <div className="fixed inset-0 z-[60]" onClick={() => setLocOpen(false)}></div>
-                    <div className="absolute z-[70] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-40 overflow-y-auto animate-in slide-in-from-top-1">
-                      {locations.filter(l => l.name.toLowerCase().includes(locSearch.toLowerCase())).map(l => (
+                  <div className="absolute z-[100] w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-48 overflow-y-auto animate-in slide-in-from-top-1">
+                    {filteredLocations.length > 0 ? (
+                      filteredLocations.map(l => (
                         <button
                           key={l.id}
                           type="button"
-                          onClick={() => {
-                            setFormData(p => ({...p, location_id: l.id}));
-                            setLocSearch(l.name);
-                            setLocOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0"
+                          onClick={() => handleSelectLocation(l)}
+                          className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 text-sm font-medium border-b border-slate-50 last:border-0 flex items-center gap-2"
                         >
+                          <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
                           {l.name}
                         </button>
-                      ))}
-                    </div>
-                  </>
+                      ))
+                    ) : (
+                      <div className="p-3 text-slate-400 text-sm text-center">ไม่พบสาขาที่ค้นหา</div>
+                    )}
+                    {locSearch.trim() && !locations.some(l => l.name.toLowerCase() === locSearch.trim().toLowerCase()) && (
+                      <button
+                        type="button"
+                        onClick={handleAddNewLocation}
+                        disabled={isAddingLoc}
+                        className="w-full text-left px-4 py-2.5 text-primary-600 font-bold hover:bg-primary-50 transition border-t border-slate-100 flex items-center gap-2 text-sm"
+                      >
+                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        {isAddingLoc ? 'กำลังเพิ่ม...' : `เพิ่มสาขาใหม่ "${locSearch.trim()}"`}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
+              {/* Spacer to prevent modal clipping dropdown */}
+              {locOpen && <div className="h-32"></div>}
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setShowCreateModal(false)} className="btn-secondary">Cancel</button>
                 <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Creating...' : 'Create'}</button>
