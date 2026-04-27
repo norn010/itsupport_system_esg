@@ -53,13 +53,14 @@ const TicketList = () => {
   }
 
   const getStatusBadge = (status) => {
+    const normalized = status?.toLowerCase().replace(' ', '-') || 'open'
     const classes = {
-      'Open': 'badge-open',
-      'In Progress': 'badge-in-progress',
-      'Resolved': 'badge-resolved',
-      'Closed': 'badge-closed',
+      'open': 'badge-open',
+      'in-progress': 'badge-in-progress',
+      'resolved': 'badge-resolved',
+      'closed': 'badge-closed',
     }
-    return <span className={classes[status] || 'badge'}>{status}</span>
+    return <span className={classes[normalized] || 'badge'}>{status}</span>
   }
 
   const getPriorityBadge = (priority) => {

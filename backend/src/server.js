@@ -22,6 +22,8 @@ import inventoryRoutes from './routes/inventory.js';
 import userRoutes from './routes/users.js';
 import locationRoutes from './routes/locations.js';
 import rackPhotoRoutes from './routes/rackPhotos.js';
+import printerRoutes from './routes/printers.js';
+import printerLogRoutes from './routes/printerLogs.js';
 import { ChatMessage } from './models/index.js';
 
 dotenv.config();
@@ -70,6 +72,8 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/rack-photos', rackPhotoRoutes);
+app.use('/api/printers', printerRoutes);
+app.use('/api/printer-logs', printerLogRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

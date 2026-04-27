@@ -14,6 +14,9 @@ import ManageArticles from './pages/ManageArticles'
 import AssetList from './pages/AssetList'
 import AssetDetail from './pages/AssetDetail'
 import AssetDashboard from './pages/AssetDashboard'
+import PrinterList from './pages/PrinterList'
+import PrinterLogs from './pages/PrinterLogs'
+import PrinterDashboard from './pages/PrinterDashboard'
 import LicenseList from './pages/LicenseList'
 import InventoryList from './pages/InventoryList'
 import Home from './pages/Home'
@@ -101,6 +104,21 @@ function App() {
             <AssetDashboard />
           </Layout>
         } />
+        <Route path="/printers/dashboard" element={
+          <Layout requireAuth>
+            <PrinterDashboard />
+          </Layout>
+        } />
+        <Route path="/printers" element={
+          <Layout requireAuth>
+            <PrinterList />
+          </Layout>
+        } />
+        <Route path="/printer-logs" element={
+          <Layout requireAuth>
+            <PrinterLogs />
+          </Layout>
+        } />
         <Route path="/assets/:id" element={
           <Layout requireAuth>
             <AssetDetail />
@@ -111,11 +129,11 @@ function App() {
             <LicenseList />
           </Layout>
         } />
-        <Route path="/inventory" element={
+        {/* <Route path="/inventory" element={
           <Layout requireAuth>
             <InventoryList />
           </Layout>
-        } />
+        } /> */}
       </Routes>
     </div>
   )

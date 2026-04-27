@@ -35,9 +35,14 @@ const fmtDateTime = (val) => {
 
 const STATUS_STYLES = {
   OPEN:        'bg-emerald-100 text-emerald-700 border-emerald-200',
-  IN_PROGRESS: 'bg-blue-100 text-blue-700 border-blue-200',
-  RESOLVED:    'bg-slate-100 text-slate-500 border-slate-200',
-  CLOSED:      'bg-slate-100 text-slate-400 border-slate-200',
+  IN_PROGRESS: 'bg-amber-100 text-amber-700 border-amber-200',
+  RESOLVED:    'bg-blue-100 text-blue-700 border-blue-200',
+  CLOSED:      'bg-purple-100 text-purple-700 border-purple-200',
+}
+
+const getStatusStyle = (status) => {
+  const s = status?.toUpperCase().replace(' ', '_') || 'OPEN'
+  return STATUS_STYLES[s] || STATUS_STYLES.OPEN
 }
 
 const TYPE_BADGE = {
@@ -169,9 +174,10 @@ const ITsTicketDashboard = () => {
 
   const counts = {
     total:       tickets.length,
-    open:        tickets.filter(t => t.status === 'OPEN').length,
-    in_progress: tickets.filter(t => t.status === 'IN_PROGRESS').length,
-    resolved:    tickets.filter(t => t.status === 'RESOLVED' || t.status === 'CLOSED').length,
+    open:        tickets.filter(t => t.status?.toUpperCase() === 'OPEN').length,
+    in_progress: tickets.filter(t => t.status?.toUpperCase().replace(' ', '_') === 'IN_PROGRESS').length,
+    resolved:    tickets.filter(t => t.status?.toUpperCase() === 'RESOLVED').length,
+    closed:      tickets.filter(t => t.status?.toUpperCase() === 'CLOSED').length,
   }
 
   return (
@@ -195,12 +201,13 @@ const ITsTicketDashboard = () => {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
           { label: 'ทั้งหมด',     value: counts.total,       color: 'text-slate-700',   bg: 'bg-slate-50',   border: 'border-slate-200' },
           { label: 'OPEN',        value: counts.open,        color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
-          { label: 'IN PROGRESS', value: counts.in_progress, color: 'text-blue-700',    bg: 'bg-blue-50',    border: 'border-blue-200' },
-          { label: 'RESOLVED',    value: counts.resolved,    color: 'text-slate-500',   bg: 'bg-slate-50',   border: 'border-slate-200' },
+          { label: 'IN PROGRESS', value: counts.in_progress, color: 'text-amber-700',   bg: 'bg-amber-50',   border: 'border-amber-200' },
+          { label: 'RESOLVED',    value: counts.resolved,    color: 'text-blue-700',    bg: 'bg-blue-50',    border: 'border-blue-200' },
+          { label: 'CLOSED',      value: counts.closed,      color: 'text-purple-700',  bg: 'bg-purple-50',  border: 'border-purple-200' },
         ].map(s => (
           <div key={s.label} className={`${s.bg} border ${s.border} rounded-2xl p-4 text-center`}>
             <p className={`text-3xl font-black ${s.color}`}>{s.value}</p>
@@ -366,7 +373,7 @@ const ITsTicketDashboard = () => {
                         )}
                       </td>
                       <td className="px-5 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-black border ${STATUS_STYLES[t.status] || STATUS_STYLES.OPEN}`}>
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-black border ${getStatusStyle(t.status)}`}>
                           {t.status?.replace('_', ' ') || 'OPEN'}
                         </span>
                       </td>

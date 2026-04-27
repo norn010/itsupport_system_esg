@@ -37,7 +37,7 @@ const AssetDashboard = () => {
         const [statsRes, licRes, invRes] = await Promise.all([
           axios.get('/api/assets/stats/dashboard'),
           axios.get('/api/licenses/expiring'),
-          axios.get('/api/inventory/low-stock')
+          // axios.get('/api/inventory/low-stock')
         ])
         setStats(statsRes.data)
         setExpiringLicenses(licRes.data)
@@ -99,7 +99,7 @@ const AssetDashboard = () => {
         <div className="flex gap-3">
           <Link to="/assets" className="btn-secondary text-sm">View All Assets</Link>
           <Link to="/licenses" className="btn-secondary text-sm">Licenses</Link>
-          <Link to="/inventory" className="btn-secondary text-sm">Inventory</Link>
+          {/* <Link to="/inventory" className="btn-secondary text-sm">Inventory</Link> */}
         </div>
       </div>
 
@@ -235,7 +235,7 @@ const AssetDashboard = () => {
         </div>
 
         {/* Low Stock */}
-        <div className="card !p-0 overflow-hidden">
+        {/* <div className="card !p-0 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 bg-orange-50/50">
             <h2 className="font-bold text-slate-800">📦 Low Stock Items</h2>
           </div>
@@ -257,7 +257,7 @@ const AssetDashboard = () => {
               ))}
             </div>
           )}
-        </div>
+        </div> */}
       </div>
     </div>
   )

@@ -52,7 +52,10 @@ const QueueTicket = () => {
   }
 
   const inProgressTickets = tickets
-    .filter(t => t.status === 'In Progress')
+    .filter(t => {
+      const s = t.status?.toLowerCase().replace(' ', '-')
+      return s === 'in-progress' || s === 'in_progress'
+    })
     .sort((a, b) => {
       const weightA = getPriorityWeight(a.priority)
       const weightB = getPriorityWeight(b.priority)
@@ -61,17 +64,18 @@ const QueueTicket = () => {
     })
 
   const resolvedTickets = tickets
-    .filter(t => t.status === 'Resolved')
+    .filter(t => t.status?.toLowerCase() === 'resolved')
     .sort((a, b) => parseDate(b.created_at) - parseDate(a.created_at))
 
   const getStatusBadge = (status) => {
+    const normalized = status?.toLowerCase().replace(' ', '-') || 'open'
     const classes = {
-      'Open': 'badge-open',
-      'In Progress': 'badge-in-progress',
-      'Resolved': 'badge-resolved',
-      'Closed': 'badge-closed',
+      'open': 'badge-open',
+      'in-progress': 'badge-in-progress',
+      'resolved': 'badge-resolved',
+      'closed': 'badge-closed',
     }
-    return <span className={classes[status] || 'badge'}>{status}</span>
+    return <span className={classes[normalized] || 'badge'}>{status}</span>
   }
 
   const getPriorityBadge = (priority) => {
