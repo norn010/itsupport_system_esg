@@ -6,6 +6,7 @@ import { logActivity } from '../services/activityLogger.js';
 import { createSystemNotification, notifyAllITStaff } from './notifications.js';
 import { io } from '../server.js';
 import exceljs from 'exceljs';
+import { uploadMultipleToFirebase } from '../utils/firebaseUpload.js';
 
 const generateTicketId = () => {
   const date = new Date();
@@ -43,14 +44,16 @@ export const createTicket = async (req, res) => {
     });
 
     // Save images if uploaded
+    let imageUrls = [];
     if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        await TicketImage.create(ticket.id, `/uploads/${file.filename}`);
+      imageUrls = await uploadMultipleToFirebase(req.files, 'tickets');
+      for (const url of imageUrls) {
+        await TicketImage.create(ticket.id, url);
       }
     }
 
     // Send notifications
-    const firstImageUrl = req.files && req.files.length > 0 ? `/uploads/${req.files[0].filename}` : null;
+    const firstImageUrl = imageUrls.length > 0 ? imageUrls[0] : null;
     await sendTicketNotification(ticket, 'created');
     await sendLineNotification(ticket, 'created');
     await sendDiscordNotification(ticket, 'created', '', firstImageUrl);
@@ -64,7 +67,7 @@ export const createTicket = async (req, res) => {
       message: 'Ticket created successfully',
       ticket: {
         ...ticket,
-        images: req.files ? req.files.map(f => `/uploads/${f.filename}`) : [],
+        images: imageUrls,
       },
     });
   } catch (error) {

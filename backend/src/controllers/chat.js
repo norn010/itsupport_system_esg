@@ -8,6 +8,7 @@ import { io } from '../server.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { uploadToFirebase } from '../utils/firebaseUpload.js';
 
 // Setup multer for chat attachments
 const uploadDir = 'uploads/chat';
@@ -15,14 +16,7 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `chat-${Date.now()}${path.extname(file.originalname)}`);
-  }
-});
+const storage = multer.memoryStorage();
 
 export const upload = multer({
   storage,
@@ -72,7 +66,10 @@ export const createMessage = async (req, res) => {
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
-    const filePath = file ? `/uploads/chat/${file.filename}` : null;
+    let filePath = null;
+    if (file) {
+      filePath = await uploadToFirebase(file, 'chat');
+    }
 
     const chatMessage = await ChatMessage.create({
       ticket_id: id,

@@ -2,6 +2,7 @@ import db from '../config/firebase.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { uploadBufferToFirebase } from '../utils/firebaseUpload.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,11 +13,7 @@ const toObj = (doc) => {
   return { id: doc.id, ...doc.data() };
 };
 
-// Ensure rack_photos upload directory exists
-const rackUploadDir = path.join(__dirname, '../../uploads/rack_photos');
-if (!fs.existsSync(rackUploadDir)) {
-  fs.mkdirSync(rackUploadDir, { recursive: true });
-}
+
 
 export const getRackPhotos = async (req, res) => {
   try {
@@ -42,18 +39,15 @@ export const createRackPhoto = async (req, res) => {
       return res.status(400).json({ message: 'Location and recorded_by are required' });
     }
 
-    // Save base64 image to disk instead of storing in Firestore (>1MB limit)
+    // Save base64 image to Firebase Storage
     let file_path = null;
     if (image_data && image_name) {
       // Strip the data URI prefix: "data:image/png;base64,xxxx"
       const matches = image_data.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
       if (matches && matches[2]) {
+        const mimetype = matches[1];
         const buffer = Buffer.from(matches[2], 'base64');
-        const ext = image_name.split('.').pop() || 'jpg';
-        const savedName = `rack_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-        const savedPath = path.join(rackUploadDir, savedName);
-        fs.writeFileSync(savedPath, buffer);
-        file_path = `/uploads/rack_photos/${savedName}`;
+        file_path = await uploadBufferToFirebase(buffer, image_name, mimetype, 'rack_photos');
       }
     }
 

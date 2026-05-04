@@ -15,15 +15,7 @@ import {
 } from '../controllers/tickets.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  },
-});
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];

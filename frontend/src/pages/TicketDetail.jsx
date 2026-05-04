@@ -631,7 +631,7 @@ const TicketDetail = () => {
                         </div>
                         {msg.file_path && (
                           <div className="mb-3">
-                            {msg.file_path.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                            {msg.file_path.match(/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i) ? (
                               <div className="rounded-xl overflow-hidden border border-black/5 cursor-pointer hover:ring-2 hover:ring-white/20 transition" onClick={() => setSelectedImage(msg.file_path)}>
                                 <img src={msg.file_path} alt="Chat attachment" className="w-full h-auto max-h-80 object-cover" />
                               </div>

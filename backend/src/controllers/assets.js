@@ -1,6 +1,7 @@
 import { Asset, AssetAssignment, AssetLog, AssetMaintenance, AssetCategory, Vendor, Location, TicketAsset } from '../models/assetModels.js';
 import { createSystemNotification, notifyAllITStaff } from './notifications.js';
 import fs from 'fs';
+import { uploadToFirebase } from '../utils/firebaseUpload.js';
 
 // Ensure asset uploads directory exists
 const assetDir = 'uploads/assets';
@@ -54,7 +55,8 @@ export const createAsset = async (req, res) => {
     data.asset_code = await Asset.getNextCode();
     
     if (req.file) {
-      data.image_url = `/uploads/assets/${req.file.filename}`;
+      const url = await uploadToFirebase(req.file, 'assets');
+      data.image_url = url;
     }
 
     const asset = await Asset.create(data);
@@ -124,7 +126,8 @@ export const updateAsset = async (req, res) => {
     }
 
     if (req.file) {
-      updates.image_url = `/uploads/assets/${req.file.filename}`;
+      const url = await uploadToFirebase(req.file, 'assets');
+      updates.image_url = url;
     }
 
     const updated = await Asset.update(req.params.id, updates);

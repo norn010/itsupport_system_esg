@@ -12,7 +12,7 @@ const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf8'));
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  // If you need storage, you'd add: storageBucket: 'YOUR_PROJECT_ID.appspot.com'
+  storageBucket: 'it-support-esg-392d3.firebasestorage.app'
 });
 
 const db = admin.firestore();
@@ -25,5 +25,7 @@ const FieldValue = admin.firestore.FieldValue;
 
 console.log('Firebase Admin SDK initialized');
 
-export { db, auth, FieldValue };
+const bucket = admin.storage().bucket();
+
+export { db, auth, FieldValue, bucket };
 export default db;

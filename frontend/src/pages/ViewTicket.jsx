@@ -547,7 +547,7 @@ const ViewTicket = () => {
                   </p>
                   {msg.file_path && (
                     <div className="mb-2">
-                       {msg.file_path.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                       {msg.file_path.match(/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i) ? (
                          <img 
                           src={msg.file_path} 
                           alt="Chat attachment" 
